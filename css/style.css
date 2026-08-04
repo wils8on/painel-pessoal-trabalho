@@ -147,7 +147,24 @@ h1, h2, h3 { font-family: var(--font-display); }
 .input::placeholder { color: var(--ink-faint); }
 .input.mono { font-family: var(--font-mono); }
 .textarea { resize: vertical; line-height: 1.55; }
-.select { appearance: none; }
+.select { appearance: none; color-scheme: inherit; }
+/* Força contraste na lista nativa de opções (o navegador não herda
+   sempre o glassmorphism, então fixamos fundo escuro/claro sólido
+   e texto legível tanto para o <select> quanto para cada <option>). */
+select, .input.select {
+  background-color: var(--surface-solid);
+  color: var(--ink);
+}
+select option {
+  background-color: var(--surface-solid);
+  color: var(--ink);
+}
+select option:checked,
+select option:hover,
+select option:focus {
+  background-color: var(--primary);
+  color: #140B26;
+}
 .field-label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem; color: var(--ink-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em; }
 .field-hint { font-size: 0.76rem; color: var(--ink-muted); margin: -0.2rem 0 0.7rem; }
 
