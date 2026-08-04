@@ -22,7 +22,7 @@
     <div class="login-mark">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>
     </div>
-    <h1 class="login-title">Dôssie</h1>
+    <h1 class="login-title">Nova</h1>
     <p class="login-subtitle">Seu painel pessoal e de trabalho — diário, acompanhamentos, demandas, projetos e agenda, tudo num só lugar.</p>
     <button id="google-signin-btn" class="btn btn-google">
       <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
@@ -153,25 +153,60 @@
       </header>
 
       <div class="toolbar">
-        <input type="search" id="diario-search" class="input" placeholder="Buscar por título ou conteúdo…" />
+        <input type="search" id="diario-search" class="input" placeholder="Buscar por título, conteúdo ou tag…" />
         <select id="diario-filter-cat" class="input select">
           <option value="">Todas as categorias</option>
           <option value="Ideia Solta">Ideia Solta</option>
           <option value="Capítulo">Capítulo</option>
+          <option value="Cena">Cena</option>
           <option value="Personagem">Personagem</option>
           <option value="Plot">Plot</option>
+          <option value="Nota de Pesquisa">Nota de Pesquisa</option>
+        </select>
+        <select id="diario-filter-book" class="input select">
+          <option value="">Todos os livros/projetos</option>
         </select>
       </div>
 
       <div id="diario-form-wrap" class="form-card hidden">
         <input type="hidden" id="diario-edit-id" />
-        <input type="text" id="diario-title" class="input" placeholder="Título" />
-        <select id="diario-category" class="input select">
-          <option value="Ideia Solta">Ideia Solta</option>
-          <option value="Capítulo">Capítulo</option>
-          <option value="Personagem">Personagem</option>
-          <option value="Plot">Plot</option>
-        </select>
+        <div class="form-row">
+          <input type="text" id="diario-title" class="input" placeholder="Título" />
+        </div>
+        <div class="form-row form-row-2">
+          <input type="text" id="diario-book" class="input" placeholder="Livro / projeto (ex: A Última Colheita)" />
+          <select id="diario-status" class="input select">
+            <option value="Rascunho">Rascunho</option>
+            <option value="Em revisão">Em revisão</option>
+            <option value="Finalizado">Finalizado</option>
+          </select>
+        </div>
+        <div class="form-row form-row-2">
+          <select id="diario-category" class="input select">
+            <option value="Ideia Solta">Ideia Solta</option>
+            <option value="Capítulo">Capítulo</option>
+            <option value="Cena">Cena</option>
+            <option value="Personagem">Personagem</option>
+            <option value="Plot">Plot</option>
+            <option value="Nota de Pesquisa">Nota de Pesquisa</option>
+          </select>
+          <input type="text" id="diario-tags" class="input" placeholder="Tags separadas por vírgula (ex: mistério, capítulo 3)" />
+        </div>
+
+        <div class="image-upload">
+          <input type="hidden" id="diario-image-url" value="" />
+          <label class="image-upload-label" for="diario-image-file">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="1.6"/><path d="m21 15-5-5-9 9"/></svg>
+            <span id="diario-image-label-text">Adicionar imagem de capa</span>
+          </label>
+          <input type="file" id="diario-image-file" accept="image/*" class="image-upload-input" />
+          <span class="image-upload-status" id="diario-image-status"></span>
+          <div class="image-preview-wrap hidden" id="diario-image-preview-wrap">
+            <img id="diario-image-preview" class="image-preview" alt="Prévia da imagem de capa" />
+            <button type="button" class="btn btn-ghost btn-sm" id="diario-image-remove">Remover imagem</button>
+          </div>
+        </div>
+
         <textarea id="diario-content" class="input textarea" rows="10" placeholder="Escreva aqui… suporta **negrito**, *itálico*, # Título e listas com -"></textarea>
         <div class="form-actions">
           <button class="btn btn-ghost" id="diario-cancel-btn">Cancelar</button>
@@ -295,8 +330,9 @@
         </div>
         <textarea id="projeto-desc" class="input textarea" rows="3" placeholder="Descrição / objetivo do projeto"></textarea>
         <textarea id="projeto-next" class="input textarea" rows="2" placeholder="Próximos passos (opcional)"></textarea>
-        <label class="range-label">Progresso: <span id="projeto-progress-value">0</span>%</label>
+        <label class="range-label">Progresso atual: <span id="projeto-progress-value">0</span>%</label>
         <input type="range" id="projeto-progress" min="0" max="100" value="0" class="range" />
+        <p class="field-hint">Depois de criar o projeto, você pode registrar novas atualizações de progresso direto no card, com data e observação — sem precisar reabrir este formulário.</p>
         <div class="form-actions">
           <button class="btn btn-ghost" id="projeto-cancel-btn">Cancelar</button>
           <button class="btn btn-primary" data-accent="teal" id="projeto-save-btn">Salvar</button>

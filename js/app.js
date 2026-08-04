@@ -3,6 +3,7 @@
 // Vanilla JS (ES6+) + Firebase v10 (modular SDK)
 // =========================================================
 import { auth, db, googleProvider } from "./firebase-config.js";
+import { uploadImageToCloudinary } from "./cloudinary-config.js";
 import {
   signInWithPopup,
   signOut,
@@ -216,12 +217,70 @@ function startAllModules(uid) {
 ========================================================= */
 let diaryItems = [];
 const diaryForm = $("#diario-form-wrap");
+const diaryImageFile = $("#diario-image-file");
+const diaryImageStatus = $("#diario-image-status");
+const diaryImagePreviewWrap = $("#diario-image-preview-wrap");
+const diaryImagePreview = $("#diario-image-preview");
+const diaryImageLabelText = $("#diario-image-label-text");
+
+function resetDiaryImageField() {
+  $("#diario-image-url").value = "";
+  diaryImageFile.value = "";
+  diaryImagePreviewWrap.classList.add("hidden");
+  diaryImagePreview.src = "";
+  diaryImageStatus.textContent = "";
+  diaryImageLabelText.textContent = "Adicionar imagem de capa";
+}
+
+function setDiaryImagePreview(url) {
+  $("#diario-image-url").value = url || "";
+  if (url) {
+    diaryImagePreview.src = url;
+    diaryImagePreviewWrap.classList.remove("hidden");
+    diaryImageLabelText.textContent = "Trocar imagem de capa";
+  } else {
+    diaryImagePreviewWrap.classList.add("hidden");
+    diaryImagePreview.src = "";
+    diaryImageLabelText.textContent = "Adicionar imagem de capa";
+  }
+}
+
+diaryImageFile.addEventListener("change", async () => {
+  const file = diaryImageFile.files[0];
+  if (!file) return;
+  diaryImageStatus.textContent = "Enviando imagem…";
+  try {
+    const url = await uploadImageToCloudinary(file);
+    setDiaryImagePreview(url);
+    diaryImageStatus.textContent = "Imagem enviada ✓";
+    setTimeout(() => { diaryImageStatus.textContent = ""; }, 2500);
+  } catch (err) {
+    console.error(err);
+    diaryImageStatus.textContent = "";
+    alert(err.message || "Não foi possível enviar a imagem.");
+    diaryImageFile.value = "";
+  }
+});
+$("#diario-image-remove").addEventListener("click", () => setDiaryImagePreview(""));
+
+function populateDiaryBookFilter() {
+  const select = $("#diario-filter-book");
+  const current = select.value;
+  const books = [...new Set(diaryItems.map((i) => i.book).filter(Boolean))].sort();
+  select.innerHTML = `<option value="">Todos os livros/projetos</option>` +
+    books.map((b) => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
+  if (books.includes(current)) select.value = current;
+}
 
 $("#diario-new-btn").addEventListener("click", () => {
   $("#diario-edit-id").value = "";
   $("#diario-title").value = "";
+  $("#diario-book").value = "";
+  $("#diario-status").value = "Rascunho";
   $("#diario-category").value = "Ideia Solta";
+  $("#diario-tags").value = "";
   $("#diario-content").value = "";
+  resetDiaryImageField();
   diaryForm.classList.remove("hidden");
 });
 $("#diario-cancel-btn").addEventListener("click", () => diaryForm.classList.add("hidden"));
@@ -230,7 +289,16 @@ $("#diario-save-btn").addEventListener("click", async () => {
   const title = $("#diario-title").value.trim();
   const content = $("#diario-content").value.trim();
   if (!title || !content) return alert("Preencha título e conteúdo.");
-  const payload = { title, content, category: $("#diario-category").value };
+  const tags = $("#diario-tags").value.split(",").map((t) => t.trim()).filter(Boolean);
+  const payload = {
+    title,
+    content,
+    category: $("#diario-category").value,
+    book: $("#diario-book").value.trim(),
+    status: $("#diario-status").value,
+    tags,
+    imageUrl: $("#diario-image-url").value || null,
+  };
   const editId = $("#diario-edit-id").value;
   try {
     if (editId) await diaryApi.update(editId, payload);
@@ -244,24 +312,36 @@ $("#diario-save-btn").addEventListener("click", async () => {
 
 $("#diario-search").addEventListener("input", () => renderDiary());
 $("#diario-filter-cat").addEventListener("change", () => renderDiary());
+$("#diario-filter-book").addEventListener("change", () => renderDiary());
 
 function renderDiary(items) {
   if (items) diaryItems = items;
+  populateDiaryBookFilter();
   const search = $("#diario-search").value.toLowerCase();
   const cat = $("#diario-filter-cat").value;
+  const book = $("#diario-filter-book").value;
   const filtered = diaryItems
     .filter((i) => !cat || i.category === cat)
-    .filter((i) => !search || i.title.toLowerCase().includes(search) || i.content.toLowerCase().includes(search))
+    .filter((i) => !book || i.book === book)
+    .filter((i) => !search ||
+      i.title.toLowerCase().includes(search) ||
+      i.content.toLowerCase().includes(search) ||
+      (i.tags || []).some((t) => t.toLowerCase().includes(search)) ||
+      (i.book || "").toLowerCase().includes(search))
     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
   $("#diario-empty").classList.toggle("hidden", filtered.length > 0);
   $("#diario-list").innerHTML = filtered.map((item) => `
     <article class="entry-card">
+      ${item.imageUrl ? `<img src="${item.imageUrl}" class="entry-cover" alt="Capa de ${escapeHtml(item.title)}" loading="lazy">` : ""}
       <div class="entry-card-top">
         <span class="entry-tag" style="background:var(--amber-soft); color:var(--amber);">${escapeHtml(item.category)}</span>
+        <span class="badge badge-status">${escapeHtml(item.status || "Rascunho")}</span>
       </div>
       <h3 class="entry-title">${escapeHtml(item.title)}</h3>
+      ${item.book ? `<p class="entry-meta"><span>📖 ${escapeHtml(item.book)}</span></p>` : ""}
       <div class="entry-body">${mdToHtml(item.content)}</div>
+      ${(item.tags || []).length ? `<div class="entry-tags">${item.tags.map((t) => `<span class="tag-chip">#${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       <div class="entry-actions">
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
@@ -273,8 +353,13 @@ function renderDiary(items) {
     const item = diaryItems.find((i) => i.id === btn.dataset.id);
     $("#diario-edit-id").value = item.id;
     $("#diario-title").value = item.title;
+    $("#diario-book").value = item.book || "";
+    $("#diario-status").value = item.status || "Rascunho";
     $("#diario-category").value = item.category;
+    $("#diario-tags").value = (item.tags || []).join(", ");
     $("#diario-content").value = item.content;
+    setDiaryImagePreview(item.imageUrl || "");
+    diaryImageStatus.textContent = "";
     diaryForm.classList.remove("hidden");
   }));
   $$('#diario-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
@@ -468,6 +553,11 @@ $("#projeto-filter-status").addEventListener("change", () => renderProjects());
 $("#projeto-save-btn").addEventListener("click", async () => {
   const title = $("#projeto-title").value.trim();
   if (!title) return alert("Informe o nome do projeto.");
+  const newProgress = Number($("#projeto-progress").value);
+  const editId = $("#projeto-edit-id").value;
+  const existing = editId ? projectItems.find((i) => i.id === editId) : null;
+  const existingLog = existing?.progressLog || [];
+
   const payload = {
     title,
     category: $("#projeto-category").value,
@@ -477,9 +567,15 @@ $("#projeto-save-btn").addEventListener("click", async () => {
     deadline: $("#projeto-deadline").value || null,
     description: $("#projeto-desc").value.trim(),
     nextSteps: $("#projeto-next").value.trim(),
-    progress: Number($("#projeto-progress").value),
+    progress: newProgress,
   };
-  const editId = $("#projeto-edit-id").value;
+
+  // Só registra uma entrada no histórico se o progresso realmente mudou
+  // (evita poluir o histórico ao editar só a descrição, por exemplo).
+  if (!existing || existing.progress !== newProgress) {
+    payload.progressLog = [...existingLog, { date: new Date().toISOString(), percent: newProgress, note: existing ? "Atualizado pelo formulário" : "Criação do projeto" }];
+  }
+
   try {
     if (editId) await projectsApi.update(editId, payload);
     else await projectsApi.add(currentUser.uid, payload);
@@ -489,6 +585,21 @@ $("#projeto-save-btn").addEventListener("click", async () => {
     alert("Não foi possível salvar. Tente novamente.");
   }
 });
+
+// Registra uma nova atualização de progresso diretamente pelo card,
+// sem precisar reabrir o formulário completo — e guarda no histórico.
+async function quickUpdateProgress(id, percent, note) {
+  const item = projectItems.find((i) => i.id === id);
+  if (!item) return;
+  const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
+  const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: clamped, note: note?.trim() || "" }];
+  try {
+    await projectsApi.update(id, { progress: clamped, progressLog: log });
+  } catch (err) {
+    console.error(err);
+    alert("Não foi possível registrar a atualização. Tente novamente.");
+  }
+}
 
 function renderProjects(items) {
   if (items) projectItems = items;
@@ -502,6 +613,15 @@ function renderProjects(items) {
   $("#projeto-list").innerHTML = sorted.map((item) => {
     const overdue = item.deadline && item.deadline < todayStr && item.status !== "Concluido";
     const priorityClass = PRIORITY_BADGE[item.priority] || "badge-media";
+    const log = item.progressLog || [];
+    const logEntriesHtml = [...log].reverse().map((entry) => `
+      <div class="progress-log-entry">
+        <span class="log-date">${fmtDateTime(new Date(entry.date))}</span>
+        <span class="log-pct">${entry.percent}%</span>
+        ${entry.note ? `<span class="log-note">${escapeHtml(entry.note)}</span>` : ""}
+      </div>
+    `).join("");
+
     return `
     <article class="entry-card">
       <div class="entry-card-top">
@@ -519,6 +639,29 @@ function renderProjects(items) {
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${item.progress || 0}%"></div></div>
       <span class="progress-value">${item.progress || 0}% concluído</span>
+
+      <div class="progress-log">
+        <button type="button" class="progress-log-toggle" data-action="toggle-log" data-id="${item.id}">
+          Acompanhar progresso ${log.length ? `(${log.length} registro${log.length > 1 ? "s" : ""})` : ""} ▾
+        </button>
+        <div class="progress-log-panel hidden" id="log-panel-${item.id}">
+          ${logEntriesHtml ? `<div class="progress-log-entries">${logEntriesHtml}</div>` : `<p class="empty-state small">Nenhuma atualização registrada ainda.</p>`}
+          <div class="progress-log-form">
+            <div class="form-row form-row-2">
+              <label class="field-label">Novo progresso (%)
+                <input type="number" min="0" max="100" class="input mono" id="quick-progress-${item.id}" value="${item.progress || 0}" />
+              </label>
+              <label class="field-label">Observação (opcional)
+                <input type="text" class="input" id="quick-note-${item.id}" placeholder="O que mudou?" />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary btn-sm" data-accent="teal" data-action="quick-update" data-id="${item.id}">Registrar atualização</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="entry-actions">
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
@@ -527,6 +670,15 @@ function renderProjects(items) {
   `;
   }).join("");
 
+  $$('#projeto-list [data-action="toggle-log"]').forEach((btn) => btn.addEventListener("click", () => {
+    $(`#log-panel-${btn.dataset.id}`).classList.toggle("hidden");
+  }));
+  $$('#projeto-list [data-action="quick-update"]').forEach((btn) => btn.addEventListener("click", async () => {
+    const id = btn.dataset.id;
+    const percent = $(`#quick-progress-${id}`).value;
+    const note = $(`#quick-note-${id}`).value;
+    await quickUpdateProgress(id, percent, note);
+  }));
   $$('#projeto-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => {
     const item = projectItems.find((i) => i.id === btn.dataset.id);
     $("#projeto-edit-id").value = item.id;
