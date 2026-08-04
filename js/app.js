@@ -1,5 +1,5 @@
 // =========================================================
-// js/app.js — Dossiê: Painel Pessoal e de Trabalho
+// js/app.js — Nova: Painel Pessoal e de Trabalho
 // Vanilla JS (ES6+) + Firebase v10 (modular SDK)
 // =========================================================
 import { auth, db, googleProvider } from "./firebase-config.js";
@@ -66,39 +66,73 @@ function fmtDate(d) {
 function fmtDateTime(d) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d);
 }
+function fmtDayMonth(day, month) {
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}`;
+}
+function tsToDate(ts) {
+  if (!ts) return null;
+  if (typeof ts.toDate === "function") return ts.toDate();
+  if (ts.seconds) return new Date(ts.seconds * 1000);
+  return null;
+}
+function relativeTime(date) {
+  if (!date) return "";
+  const diffMs = Date.now() - date.getTime();
+  const min = Math.round(diffMs / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const hrs = Math.round(min / 60);
+  if (hrs < 24) return `há ${hrs} h`;
+  const days = Math.round(hrs / 24);
+  if (days < 30) return `há ${days} d`;
+  return fmtDate(date);
+}
 
 /* ---------------------------------------------------------
    Tema (claro/escuro) — persistido em localStorage
 --------------------------------------------------------- */
 (function initTheme() {
-  const saved = localStorage.getItem("dossie-theme");
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const theme = saved || (prefersDark ? "dark" : "light");
+  const saved = localStorage.getItem("nova-theme");
+  const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+  const theme = saved || (prefersLight ? "light" : "dark");
   document.documentElement.setAttribute("data-theme", theme);
 })();
 
 $("#theme-toggle").addEventListener("click", () => {
   const html = document.documentElement;
-  const next = html.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  const next = html.getAttribute("data-theme") === "light" ? "dark" : "light";
   html.setAttribute("data-theme", next);
-  localStorage.setItem("dossie-theme", next);
+  localStorage.setItem("nova-theme", next);
 });
 
 /* ---------------------------------------------------------
-   Navegação entre módulos (abas)
+   Navegação entre módulos
 --------------------------------------------------------- */
 function switchView(viewName) {
-  $$(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === viewName));
+  $$(".rail-btn").forEach((t) => t.classList.toggle("active", t.dataset.view === viewName));
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${viewName}`));
-  localStorage.setItem("dossie-last-view", viewName);
+  localStorage.setItem("nova-last-view", viewName);
 }
-$$(".tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
+$$(".rail-btn").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
+
+/* ---------------------------------------------------------
+   Relógio & saudação do Dashboard
+--------------------------------------------------------- */
+function updateClock() {
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Bom dia," : hour < 18 ? "Boa tarde," : "Boa noite,";
+  $("#dash-greeting").textContent = greeting;
+  $("#dash-clock-time").textContent = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(now);
+  $("#dash-clock-date").textContent = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(now);
+}
+setInterval(updateClock, 30000);
 
 /* ---------------------------------------------------------
    Autenticação
 --------------------------------------------------------- */
 let currentUser = null;
-const unsubscribers = []; // listeners do Firestore ativos, para limpar no logout
+const unsubscribers = [];
 
 $("#google-signin-btn").addEventListener("click", async () => {
   try {
@@ -121,8 +155,11 @@ onAuthStateChanged(auth, (user) => {
     $("#login-screen").classList.add("hidden");
     $("#app-shell").classList.remove("hidden");
     $("#user-photo").src = user.photoURL || "";
-    $("#user-name").textContent = user.displayName || user.email || "Usuário";
-    switchView(localStorage.getItem("dossie-last-view") || "diario");
+    $("#user-photo").title = user.displayName || user.email || "";
+    $("#dash-username").textContent = (user.displayName || user.email || "Usuário").split(" ")[0];
+    updateClock();
+    switchView(localStorage.getItem("nova-last-view") || "dashboard");
+    populateDaySelect();
     startAllModules(user.uid);
   } else {
     $("#login-screen").classList.remove("hidden");
@@ -132,7 +169,6 @@ onAuthStateChanged(auth, (user) => {
 
 /* ---------------------------------------------------------
    Firestore — fábrica de CRUD genérico por coleção
-   Cada documento inclui userId para isolar os dados por conta.
 --------------------------------------------------------- */
 function makeCollectionApi(collectionName) {
   const colRef = collection(db, collectionName);
@@ -206,8 +242,8 @@ $("#diario-save-btn").addEventListener("click", async () => {
   }
 });
 
-$("#diario-search").addEventListener("input", renderDiary.bind(null, diaryItems));
-$("#diario-filter-cat").addEventListener("change", renderDiary.bind(null, diaryItems));
+$("#diario-search").addEventListener("input", () => renderDiary());
+$("#diario-filter-cat").addEventListener("change", () => renderDiary());
 
 function renderDiary(items) {
   if (items) diaryItems = items;
@@ -222,7 +258,7 @@ function renderDiary(items) {
   $("#diario-list").innerHTML = filtered.map((item) => `
     <article class="entry-card">
       <div class="entry-card-top">
-        <span class="entry-tag">${escapeHtml(item.category)}</span>
+        <span class="entry-tag" style="background:var(--amber-soft); color:var(--amber);">${escapeHtml(item.category)}</span>
       </div>
       <h3 class="entry-title">${escapeHtml(item.title)}</h3>
       <div class="entry-body">${mdToHtml(item.content)}</div>
@@ -244,6 +280,8 @@ function renderDiary(items) {
   $$('#diario-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir esta anotação?")) diaryApi.remove(btn.dataset.id);
   }));
+
+  refreshDashboard();
 }
 
 /* =========================================================
@@ -282,7 +320,7 @@ $("#ahsd-save-btn").addEventListener("click", async () => {
   }
 });
 
-$("#ahsd-search").addEventListener("input", renderAhsd.bind(null, ahsdItems));
+$("#ahsd-search").addEventListener("input", () => renderAhsd());
 
 function renderAhsd(items) {
   if (items) ahsdItems = items;
@@ -313,6 +351,8 @@ function renderAhsd(items) {
   $$('#ahsd-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir este registro?")) ahsdApi.remove(btn.dataset.id);
   }));
+
+  refreshDashboard();
 }
 
 /* =========================================================
@@ -325,7 +365,6 @@ $("#kanban-new-btn").addEventListener("click", () => {
   $("#kanban-edit-id").value = "";
   $("#kanban-title").value = "";
   $("#kanban-desc").value = "";
-  kanbanForm.dataset.status = "todo";
   kanbanForm.classList.remove("hidden");
 });
 $("#kanban-cancel-btn").addEventListener("click", () => kanbanForm.classList.add("hidden"));
@@ -348,7 +387,7 @@ $("#kanban-save-btn").addEventListener("click", async () => {
 function renderKanban(items) {
   if (items) kanbanItems = items;
   const cols = { todo: [], doing: [], done: [] };
-  kanbanItems
+  [...kanbanItems]
     .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))
     .forEach((item) => cols[item.status || "todo"].push(item));
 
@@ -381,6 +420,8 @@ function renderKanban(items) {
     e.stopPropagation();
     if (confirm("Excluir esta demanda?")) kanbanApi.remove(btn.dataset.id);
   }));
+
+  refreshDashboard();
 }
 
 $$(".kanban-dropzone").forEach((zone) => {
@@ -396,15 +437,24 @@ $$(".kanban-dropzone").forEach((zone) => {
 });
 
 /* =========================================================
-   MÓDULO 4 — Projetos & Planos
+   MÓDULO 4 — Projetos & Planos (formulário detalhado)
 ========================================================= */
 let projectItems = [];
 const projetoForm = $("#projeto-form-wrap");
 
+const PRIORITY_BADGE = { Baixa: "badge-baixa", Media: "badge-media", Alta: "badge-alta", Critica: "badge-critica" };
+const PRIORITY_LABEL = { Baixa: "Baixa", Media: "Média", Alta: "Alta", Critica: "Crítica" };
+
 $("#projeto-new-btn").addEventListener("click", () => {
   $("#projeto-edit-id").value = "";
   $("#projeto-title").value = "";
+  $("#projeto-category").value = "Sistema/TI";
+  $("#projeto-priority").value = "Media";
+  $("#projeto-status").value = "Planejamento";
+  $("#projeto-start").value = "";
+  $("#projeto-deadline").value = "";
   $("#projeto-desc").value = "";
+  $("#projeto-next").value = "";
   $("#projeto-progress").value = 0;
   $("#projeto-progress-value").textContent = 0;
   projetoForm.classList.remove("hidden");
@@ -413,13 +463,20 @@ $("#projeto-cancel-btn").addEventListener("click", () => projetoForm.classList.a
 $("#projeto-progress").addEventListener("input", (e) => {
   $("#projeto-progress-value").textContent = e.target.value;
 });
+$("#projeto-filter-status").addEventListener("change", () => renderProjects());
 
 $("#projeto-save-btn").addEventListener("click", async () => {
   const title = $("#projeto-title").value.trim();
   if (!title) return alert("Informe o nome do projeto.");
   const payload = {
     title,
+    category: $("#projeto-category").value,
+    priority: $("#projeto-priority").value,
+    status: $("#projeto-status").value,
+    start: $("#projeto-start").value || null,
+    deadline: $("#projeto-deadline").value || null,
     description: $("#projeto-desc").value.trim(),
+    nextSteps: $("#projeto-next").value.trim(),
     progress: Number($("#projeto-progress").value),
   };
   const editId = $("#projeto-edit-id").value;
@@ -435,12 +492,31 @@ $("#projeto-save-btn").addEventListener("click", async () => {
 
 function renderProjects(items) {
   if (items) projectItems = items;
-  const sorted = [...projectItems].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const statusFilter = $("#projeto-filter-status").value;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const sorted = [...projectItems]
+    .filter((i) => !statusFilter || i.status === statusFilter)
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
   $("#projeto-empty").classList.toggle("hidden", sorted.length > 0);
-  $("#projeto-list").innerHTML = sorted.map((item) => `
+  $("#projeto-list").innerHTML = sorted.map((item) => {
+    const overdue = item.deadline && item.deadline < todayStr && item.status !== "Concluido";
+    const priorityClass = PRIORITY_BADGE[item.priority] || "badge-media";
+    return `
     <article class="entry-card">
+      <div class="entry-card-top">
+        <span class="entry-tag" style="background:var(--teal-soft); color:var(--teal);">${escapeHtml(item.category || "Outro")}</span>
+        <span class="badge ${priorityClass}">${PRIORITY_LABEL[item.priority] || item.priority}</span>
+        <span class="badge badge-status">${escapeHtml(item.status || "Planejamento")}</span>
+        ${overdue ? `<span class="badge badge-overdue">Atrasado</span>` : ""}
+      </div>
       <h3 class="entry-title">${escapeHtml(item.title)}</h3>
       ${item.description ? `<p class="entry-body">${escapeHtml(item.description)}</p>` : ""}
+      ${item.nextSteps ? `<p class="entry-body"><strong>Próximos passos:</strong> ${escapeHtml(item.nextSteps)}</p>` : ""}
+      <div class="entry-meta">
+        ${item.start ? `<span>Início: ${fmtDate(new Date(item.start + "T00:00:00"))}</span>` : ""}
+        ${item.deadline ? `<span>Prazo: ${fmtDate(new Date(item.deadline + "T00:00:00"))}</span>` : ""}
+      </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${item.progress || 0}%"></div></div>
       <span class="progress-value">${item.progress || 0}% concluído</span>
       <div class="entry-actions">
@@ -448,13 +524,20 @@ function renderProjects(items) {
         <button data-action="delete" data-id="${item.id}">Excluir</button>
       </div>
     </article>
-  `).join("");
+  `;
+  }).join("");
 
   $$('#projeto-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => {
     const item = projectItems.find((i) => i.id === btn.dataset.id);
     $("#projeto-edit-id").value = item.id;
     $("#projeto-title").value = item.title;
+    $("#projeto-category").value = item.category || "Sistema/TI";
+    $("#projeto-priority").value = item.priority || "Media";
+    $("#projeto-status").value = item.status || "Planejamento";
+    $("#projeto-start").value = item.start || "";
+    $("#projeto-deadline").value = item.deadline || "";
     $("#projeto-desc").value = item.description || "";
+    $("#projeto-next").value = item.nextSteps || "";
     $("#projeto-progress").value = item.progress || 0;
     $("#projeto-progress-value").textContent = item.progress || 0;
     projetoForm.classList.remove("hidden");
@@ -462,6 +545,8 @@ function renderProjects(items) {
   $$('#projeto-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir este projeto?")) projectsApi.remove(btn.dataset.id);
   }));
+
+  refreshDashboard();
 }
 
 /* =========================================================
@@ -471,6 +556,17 @@ let eventItems = [];
 let birthdayItems = [];
 const eventoForm = $("#evento-form-wrap");
 const niverForm = $("#niver-form-wrap");
+
+function populateDaySelect() {
+  const select = $("#niver-day");
+  if (select.options.length) return;
+  for (let d = 1; d <= 31; d++) {
+    const opt = document.createElement("option");
+    opt.value = String(d);
+    opt.textContent = String(d).padStart(2, "0");
+    select.appendChild(opt);
+  }
+}
 
 $("#evento-new-btn").addEventListener("click", () => {
   $("#evento-edit-id").value = "";
@@ -497,12 +593,14 @@ $("#evento-save-btn").addEventListener("click", async () => {
   }
 });
 
+function upcomingEvents() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  return eventItems.filter((i) => i.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function renderEvents(items) {
   if (items) eventItems = items;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const upcoming = eventItems
-    .filter((i) => i.date >= todayStr)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const upcoming = upcomingEvents();
 
   $("#evento-empty").classList.toggle("hidden", upcoming.length > 0);
   $("#evento-list").innerHTML = upcoming.map((item) => `
@@ -529,21 +627,25 @@ function renderEvents(items) {
   $$('#evento-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir este evento?")) eventsApi.remove(btn.dataset.id);
   }));
+
+  refreshDashboard();
 }
 
 $("#niver-new-btn").addEventListener("click", () => {
   $("#niver-edit-id").value = "";
   $("#niver-name").value = "";
-  $("#niver-date").value = "";
+  $("#niver-day").value = "1";
+  $("#niver-month").value = "1";
   niverForm.classList.remove("hidden");
 });
 $("#niver-cancel-btn").addEventListener("click", () => niverForm.classList.add("hidden"));
 
 $("#niver-save-btn").addEventListener("click", async () => {
   const name = $("#niver-name").value.trim();
-  const date = $("#niver-date").value;
-  if (!name || !date) return alert("Preencha nome e data de nascimento.");
-  const payload = { name, date };
+  const day = Number($("#niver-day").value);
+  const month = Number($("#niver-month").value);
+  if (!name || !day || !month) return alert("Preencha nome, dia e mês.");
+  const payload = { name, day, month };
   const editId = $("#niver-edit-id").value;
   try {
     if (editId) await birthdaysApi.update(editId, payload);
@@ -555,48 +657,204 @@ $("#niver-save-btn").addEventListener("click", async () => {
   }
 });
 
-$("#niver-filter-month").addEventListener("change", renderBirthdays.bind(null, birthdayItems));
+$("#niver-filter-month").addEventListener("change", () => renderBirthdays());
 
-// Calcula dias restantes até a próxima ocorrência do aniversário (mês/dia)
-function daysUntilNextBirthday(dateStr) {
-  const birth = new Date(dateStr + "T00:00:00");
+// Verifica se o aniversário (dia/mês, sem ano) já passou neste ano e quanto
+// tempo falta para a próxima ocorrência.
+function nextBirthdayInfo(day, month) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  let next = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
-  if (next < today) next = new Date(today.getFullYear() + 1, birth.getMonth(), birth.getDate());
-  const diffMs = next - today;
-  return Math.round(diffMs / 86400000);
+  const thisYear = new Date(today.getFullYear(), month - 1, day);
+  thisYear.setHours(0, 0, 0, 0);
+
+  if (thisYear.getTime() === today.getTime()) {
+    return { daysLeft: 0, isToday: true, alreadyPassed: false };
+  }
+  if (thisYear > today) {
+    const daysLeft = Math.round((thisYear - today) / 86400000);
+    return { daysLeft, isToday: false, alreadyPassed: false };
+  }
+  const nextYear = new Date(today.getFullYear() + 1, month - 1, day);
+  const daysLeft = Math.round((nextYear - today) / 86400000);
+  return { daysLeft, isToday: false, alreadyPassed: true };
+}
+
+function upcomingBirthdays(limit = 100) {
+  return birthdayItems
+    .map((i) => ({ ...i, ...nextBirthdayInfo(i.day, i.month) }))
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, limit);
 }
 
 function renderBirthdays(items) {
   if (items) birthdayItems = items;
   const monthFilter = $("#niver-filter-month").value;
-  const filtered = birthdayItems
-    .filter((i) => !monthFilter || (new Date(i.date + "T00:00:00").getMonth() + 1) === Number(monthFilter))
-    .map((i) => ({ ...i, daysLeft: daysUntilNextBirthday(i.date) }))
-    .sort((a, b) => a.daysLeft - b.daysLeft);
+  const filtered = upcomingBirthdays()
+    .filter((i) => !monthFilter || i.month === Number(monthFilter));
 
   $("#niver-empty").classList.toggle("hidden", filtered.length > 0);
-  $("#niver-tbody").innerHTML = filtered.map((item) => `
+  $("#niver-tbody").innerHTML = filtered.map((item) => {
+    let statusHtml;
+    if (item.isToday) statusHtml = `<span class="countdown soon">🎉 Hoje!</span>`;
+    else if (item.alreadyPassed) statusHtml = `<span class="countdown past">Já passou este ano · próximo em ${item.daysLeft} dia(s)</span>`;
+    else statusHtml = `<span class="countdown ${item.daysLeft <= 7 ? "soon" : ""}">Faltam ${item.daysLeft} dia(s)</span>`;
+
+    return `
     <tr>
       <td>${escapeHtml(item.name)}</td>
-      <td class="mono">${fmtDate(new Date(item.date + "T00:00:00"))}</td>
-      <td class="countdown ${item.daysLeft <= 7 ? "soon" : ""}">${item.daysLeft === 0 ? "Hoje!" : `${item.daysLeft} dia(s)`}</td>
+      <td class="mono">${fmtDayMonth(item.day, item.month)}</td>
+      <td>${statusHtml}</td>
       <td>
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
       </td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   $$('#niver-tbody [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => {
     const item = birthdayItems.find((i) => i.id === btn.dataset.id);
     $("#niver-edit-id").value = item.id;
     $("#niver-name").value = item.name;
-    $("#niver-date").value = item.date;
+    $("#niver-day").value = String(item.day);
+    $("#niver-month").value = String(item.month);
     niverForm.classList.remove("hidden");
   }));
   $$('#niver-tbody [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir este aniversário?")) birthdaysApi.remove(btn.dataset.id);
   }));
+
+  refreshDashboard();
+}
+
+/* =========================================================
+   DASHBOARD — resumo agregando todos os módulos
+========================================================= */
+const KANBAN_META = {
+  todo: { label: "A Fazer", color: "var(--ink-faint)" },
+  doing: { label: "Em Progresso", color: "var(--amber)" },
+  done: { label: "Concluído", color: "var(--teal)" },
+};
+const ACTIVITY_META = {
+  diario: { label: "Diário", bg: "var(--amber-soft)", color: "var(--amber)" },
+  ahsd: { label: "AH/SD", bg: "var(--plum-soft)", color: "var(--plum)" },
+  kanban: { label: "BI", bg: "var(--teal-soft)", color: "var(--teal)" },
+  projeto: { label: "Projeto", bg: "var(--teal-soft)", color: "var(--teal)" },
+  evento: { label: "Agenda", bg: "var(--rust-soft)", color: "var(--rust)" },
+  niver: { label: "Aniversário", bg: "var(--rust-soft)", color: "var(--rust)" },
+};
+
+function refreshDashboard() {
+  if (!currentUser) return;
+
+  // ---- Tira de estatísticas ----
+  const openTasks = kanbanItems.filter((i) => i.status !== "done").length;
+  const activeProjects = projectItems.filter((i) => i.status !== "Concluido").length;
+  const nextBirthday = upcomingBirthdays(1)[0];
+  const stats = [
+    { value: diaryItems.length, label: "Anotações no diário" },
+    { value: ahsdItems.length, label: "Registros AH/SD" },
+    { value: openTasks, label: "Demandas em aberto" },
+    { value: activeProjects, label: "Projetos ativos" },
+    { value: nextBirthday ? (nextBirthday.isToday ? "Hoje" : `${nextBirthday.daysLeft}d`) : "—", label: nextBirthday ? `Aniversário: ${nextBirthday.name}` : "Próximo aniversário" },
+  ];
+  $("#dash-stats").innerHTML = stats.map((s) => `
+    <div class="stat-chip">
+      <div class="stat-chip-value">${s.value}</div>
+      <div class="stat-chip-label">${escapeHtml(s.label)}</div>
+    </div>
+  `).join("");
+
+  // ---- Próximos compromissos ----
+  const nextEvents = upcomingEvents().slice(0, 5);
+  $("#dash-events-empty").classList.toggle("hidden", nextEvents.length > 0);
+  $("#dash-events-list").innerHTML = nextEvents.map((item) => `
+    <div class="list-item">
+      <div class="list-item-main">
+        <span class="list-item-title">${escapeHtml(item.title)}</span>
+        <span class="list-item-date">${fmtDate(new Date(item.date + "T00:00:00"))}</span>
+      </div>
+    </div>
+  `).join("");
+
+  // ---- Aniversários próximos ----
+  const nextBirthdays = upcomingBirthdays(5);
+  $("#dash-birthdays-empty").classList.toggle("hidden", nextBirthdays.length > 0);
+  $("#dash-birthdays-list").innerHTML = nextBirthdays.map((item) => `
+    <div class="list-item">
+      <div class="list-item-main">
+        <span class="list-item-title">${escapeHtml(item.name)}</span>
+        <span class="list-item-date">${fmtDayMonth(item.day, item.month)}</span>
+      </div>
+      <span class="badge badge-status">${item.isToday ? "Hoje 🎉" : `${item.daysLeft}d`}</span>
+    </div>
+  `).join("");
+
+  // ---- Aro de progresso médio dos projetos ativos ----
+  const active = projectItems.filter((i) => i.status !== "Concluido");
+  const avg = active.length ? Math.round(active.reduce((sum, i) => sum + (i.progress || 0), 0) / active.length) : 0;
+  const deg = Math.round(avg * 3.6);
+  $("#dash-ring-wrap").innerHTML = `
+    <div class="ring-outer" style="background:conic-gradient(var(--primary-2) ${deg}deg, var(--surface-strong) ${deg}deg)">
+      <div class="ring-inner"><span class="ring-inner-value">${avg}%</span></div>
+    </div>
+  `;
+  $("#dash-ring-caption").textContent = active.length ? `${active.length} projeto(s) em andamento` : "Nenhum projeto ativo";
+
+  // ---- Resumo do Kanban ----
+  const total = kanbanItems.length || 1;
+  $("#dash-kanban-summary").innerHTML = ["todo", "doing", "done"].map((status) => {
+    const count = kanbanItems.filter((i) => (i.status || "todo") === status).length;
+    const pct = Math.round((count / total) * 100);
+    const meta = KANBAN_META[status];
+    return `
+      <div class="kanban-mini-row">
+        <span class="kanban-mini-dot" style="background:${meta.color}"></span>
+        <span style="width:88px;flex-shrink:0;">${meta.label}</span>
+        <span class="kanban-mini-track"><span class="kanban-mini-fill" style="width:${pct}%; background:${meta.color}"></span></span>
+        <span class="kanban-mini-count">${count}</span>
+      </div>
+    `;
+  }).join("");
+
+  // ---- Prazos próximos (projetos + eventos) ----
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const projectDeadlines = projectItems
+    .filter((i) => i.deadline && i.status !== "Concluido")
+    .map((i) => ({ title: i.title, date: i.deadline, overdue: i.deadline < todayStr, kind: "Projeto" }));
+  const eventDeadlines = upcomingEvents().map((i) => ({ title: i.title, date: i.date, overdue: false, kind: "Evento" }));
+  const deadlines = [...projectDeadlines, ...eventDeadlines].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
+
+  $("#dash-deadlines-empty").classList.toggle("hidden", deadlines.length > 0);
+  $("#dash-deadlines-list").innerHTML = deadlines.map((item) => `
+    <div class="list-item">
+      <div class="list-item-main">
+        <span class="list-item-title">${escapeHtml(item.title)}</span>
+        <span class="list-item-date">${item.kind} · ${fmtDate(new Date(item.date + "T00:00:00"))}</span>
+      </div>
+      ${item.overdue ? `<span class="badge badge-overdue">Atrasado</span>` : ""}
+    </div>
+  `).join("");
+
+  // ---- Atividade recente ----
+  const activity = [
+    ...diaryItems.map((i) => ({ type: "diario", title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...ahsdItems.map((i) => ({ type: "ahsd", title: i.content.slice(0, 40), ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...kanbanItems.map((i) => ({ type: "kanban", title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...projectItems.map((i) => ({ type: "projeto", title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...eventItems.map((i) => ({ type: "evento", title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...birthdayItems.map((i) => ({ type: "niver", title: i.name, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+  ].filter((i) => i.ts).sort((a, b) => b.ts - a.ts).slice(0, 8);
+
+  $("#dash-activity-empty").classList.toggle("hidden", activity.length > 0);
+  $("#dash-activity-list").innerHTML = activity.map((item) => {
+    const meta = ACTIVITY_META[item.type];
+    return `
+      <div class="activity-row">
+        <span class="activity-tag" style="background:${meta.bg}; color:${meta.color};">${meta.label}</span>
+        <span class="activity-text">${escapeHtml(item.title)}</span>
+        <span class="activity-time">${relativeTime(item.ts)}</span>
+      </div>
+    `;
+  }).join("");
 }
