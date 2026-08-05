@@ -103,10 +103,25 @@
       <div class="stat-strip" id="dash-stats"></div>
 
       <div class="dash-grid">
-        <div class="glass-card dash-card" id="dash-events-card">
-          <div class="glass-card-head"><h3>Próximos compromissos</h3></div>
-          <div id="dash-events-list" class="list-simple compact"></div>
-          <p class="empty-state small" id="dash-events-empty">Nenhum compromisso agendado.</p>
+        <div class="glass-card dash-card dash-card-span2 dash-card-calendar">
+          <div class="glass-card-head dash-calendar-head">
+            <h3>Calendário</h3>
+            <div class="cal-nav">
+              <button type="button" class="icon-btn" id="cal-prev-btn" aria-label="Mês anterior">‹</button>
+              <span class="cal-month-label" id="cal-month-label">—</span>
+              <button type="button" class="icon-btn" id="cal-next-btn" aria-label="Próximo mês">›</button>
+            </div>
+          </div>
+          <div class="cal-weekdays">
+            <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+          <div class="cal-legend">
+            <span><i class="cal-dot" style="background:var(--rust)"></i> Evento</span>
+            <span><i class="cal-dot" style="background:var(--plum)"></i> Aniversário</span>
+            <span><i class="cal-dot" style="background:var(--teal)"></i> Prazo de projeto</span>
+          </div>
+          <div class="cal-day-details" id="cal-day-details"></div>
         </div>
 
         <div class="glass-card dash-card">
@@ -115,10 +130,15 @@
           <p class="empty-state small" id="dash-birthdays-empty">Nenhum aniversário cadastrado.</p>
         </div>
 
-        <div class="glass-card dash-card dash-card-ring">
+        <div class="glass-card dash-card dash-card-span2 dash-card-progress">
           <div class="glass-card-head"><h3>Progresso dos projetos</h3></div>
-          <div class="ring-wrap" id="dash-ring-wrap"></div>
-          <p class="ring-caption" id="dash-ring-caption">Nenhum projeto ativo</p>
+          <div class="progress-overview">
+            <div class="dash-card-ring-inline">
+              <div class="ring-wrap" id="dash-ring-wrap"></div>
+              <p class="ring-caption" id="dash-ring-caption">Nenhum projeto ativo</p>
+            </div>
+            <div class="dash-projects-breakdown" id="dash-projects-list"></div>
+          </div>
         </div>
 
         <div class="glass-card dash-card">
@@ -132,7 +152,7 @@
           <p class="empty-state small" id="dash-deadlines-empty">Nenhum prazo em aberto.</p>
         </div>
 
-        <div class="glass-card dash-card dash-card-wide">
+        <div class="glass-card dash-card dash-card-span2">
           <div class="glass-card-head"><h3>Atividade recente</h3></div>
           <div id="dash-activity-list" class="activity-list"></div>
           <p class="empty-state small" id="dash-activity-empty">Assim que você começar a usar o Nova, as novidades aparecem aqui.</p>
@@ -193,18 +213,15 @@
           <input type="text" id="diario-tags" class="input" placeholder="Tags separadas por vírgula (ex: mistério, capítulo 3)" />
         </div>
 
-        <div class="image-upload">
-          <input type="hidden" id="diario-image-url" value="" />
-          <label class="image-upload-label" for="diario-image-file">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="1.6"/><path d="m21 15-5-5-9 9"/></svg>
-            <span id="diario-image-label-text">Adicionar imagem de capa</span>
+        <div class="attachments-field">
+          <input type="hidden" id="diario-attachments-data" value="[]" />
+          <label class="image-upload-label" for="diario-attachments-file">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"/></svg>
+            <span id="diario-attachments-label-text">Adicionar imagens ou arquivos</span>
           </label>
-          <input type="file" id="diario-image-file" accept="image/*" class="image-upload-input" />
-          <span class="image-upload-status" id="diario-image-status"></span>
-          <div class="image-preview-wrap hidden" id="diario-image-preview-wrap">
-            <img id="diario-image-preview" class="image-preview" alt="Prévia da imagem de capa" />
-            <button type="button" class="btn btn-ghost btn-sm" id="diario-image-remove">Remover imagem</button>
-          </div>
+          <input type="file" id="diario-attachments-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple class="image-upload-input" />
+          <span class="image-upload-status" id="diario-attachments-status"></span>
+          <div class="attachments-list" id="diario-attachments-list"></div>
         </div>
 
         <textarea id="diario-content" class="input textarea" rows="10" placeholder="Escreva aqui… suporta **negrito**, *itálico*, # Título e listas com -"></textarea>

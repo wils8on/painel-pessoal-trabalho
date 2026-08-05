@@ -1,5 +1,5 @@
 /* =========================================================
-   Dossiê — Design tokens
+   DOSSIÊ — Design tokens
    Conceito: cockpit digital / dashboard futurista. Fundo em
    gradiente profundo com "nebulosas" radiais violeta, cartões
    em vidro fosco (glassmorphism), aro de progresso circular e
@@ -377,7 +377,7 @@ html[data-theme="light"] .icon-moon { display: block; }
 
 .dash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 .dash-card { padding: 1.1rem; min-height: 180px; }
-.dash-card-wide { grid-column: span 3; }
+.dash-card-span2 { grid-column: span 2; }
 .dash-card-ring { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .glass-card-head { margin-bottom: 0.8rem; }
 .glass-card-head h3 { font-size: 0.95rem; margin: 0; font-weight: 600; }
@@ -385,6 +385,53 @@ html[data-theme="light"] .icon-moon { display: block; }
 .ring-wrap { display: flex; align-items: center; justify-content: center; margin: 0.4rem 0; }
 .ring-caption { font-size: 0.78rem; color: var(--ink-muted); margin: 0.3rem 0 0; }
 .ring-value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700; fill: var(--ink); }
+
+/* ---------------- Progresso dos projetos (Dashboard) ---------------- */
+.dash-card-progress { min-height: auto; }
+.progress-overview { display: flex; gap: 1.4rem; align-items: flex-start; flex-wrap: wrap; }
+.dash-card-ring-inline { display: flex; flex-direction: column; align-items: center; text-align: center; flex-shrink: 0; width: 128px; }
+.dash-projects-breakdown { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 0.55rem; }
+.dash-project-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; }
+.dash-project-row .proj-name { width: 40%; min-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-project-row .proj-track { flex: 1; height: 6px; border-radius: 4px; background: var(--surface-strong); overflow: hidden; }
+.dash-project-row .proj-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--teal), #7BF0D3); }
+.dash-project-row .proj-pct { font-family: var(--font-mono); color: var(--ink-muted); width: 34px; text-align: right; flex-shrink: 0; }
+
+/* ---------------- Calendário (Dashboard) ---------------- */
+.dash-card-calendar { min-height: auto; }
+.dash-calendar-head { display: flex; justify-content: space-between; align-items: center; }
+.cal-nav { display: flex; align-items: center; gap: 0.5rem; }
+.cal-nav .icon-btn { width: 28px; height: 28px; }
+.cal-month-label { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-muted); min-width: 110px; text-align: center; }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink-faint); margin-bottom: 0.3rem; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-day {
+  aspect-ratio: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: default;
+  position: relative;
+}
+.cal-day.has-events { cursor: pointer; }
+.cal-day.has-events:hover { background: var(--surface-strong); border-color: var(--border-strong); }
+.cal-day.other-month { color: var(--ink-faint); opacity: 0.35; }
+.cal-day.today { border-color: var(--primary-2); color: var(--ink); font-weight: 700; }
+.cal-day.selected { background: var(--primary-soft); border-color: var(--primary-2); }
+.cal-day-dots { display: flex; gap: 2px; }
+.cal-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+.cal-legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.7rem; font-size: 0.72rem; color: var(--ink-muted); }
+.cal-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.cal-legend .cal-dot { width: 7px; height: 7px; }
+.cal-day-details { margin-top: 0.8rem; }
+.cal-day-details:empty { margin-top: 0; }
+.cal-day-detail-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+.cal-day-detail-item:last-child { border-bottom: none; }
+.cal-day-details-title { font-size: 0.76rem; color: var(--ink-faint); font-family: var(--font-mono); text-transform: uppercase; margin: 0 0 0.4rem; }
 
 .kanban-mini { display: flex; flex-direction: column; gap: 0.55rem; }
 .kanban-mini-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.84rem; }
@@ -467,14 +514,6 @@ html[data-theme="light"] .icon-moon { display: block; }
   white-space: nowrap;
 }
 .entry-tags { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-.entry-cover {
-  width: 100%;
-  height: 130px;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  margin-bottom: 0.2rem;
-}
 
 .image-upload { margin-bottom: 0.8rem; }
 .image-upload-input { display: none; }
@@ -494,6 +533,49 @@ html[data-theme="light"] .icon-moon { display: block; }
 .image-upload-status { display: block; font-size: 0.76rem; color: var(--ink-faint); margin-top: 0.4rem; }
 .image-preview-wrap { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.6rem; }
 .image-preview { width: 96px; height: 72px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+
+/* ---------------- Anexos (Diário: imagens e arquivos) ---------------- */
+.attachments-field { margin-bottom: 0.8rem; }
+.attachments-list { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.7rem; }
+.attachment-chip {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  max-width: 220px;
+}
+.attachment-chip img.attachment-thumb-mini {
+  width: 32px; height: 32px; object-fit: cover; border-radius: 6px; flex-shrink: 0;
+}
+.attachment-chip .attachment-icon {
+  width: 32px; height: 32px; border-radius: 6px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--amber-soft); color: var(--amber);
+}
+.attachment-chip .attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.attachment-chip .attachment-remove {
+  border: none; background: none; color: var(--ink-faint); cursor: pointer;
+  font-size: 1rem; line-height: 1; padding: 0; flex-shrink: 0;
+}
+.attachment-chip .attachment-remove:hover { color: var(--rust); }
+
+/* Anexos exibidos no card já salvo (Diário) */
+.entry-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 0.4rem; margin: 0.2rem 0; }
+.entry-gallery img {
+  width: 100%; height: 72px; object-fit: cover; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.entry-files { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.2rem 0; }
+.entry-file-chip {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: var(--surface-strong); border: 1px solid var(--border);
+  border-radius: 20px; padding: 0.3rem 0.7rem; font-size: 0.74rem;
+  color: var(--ink-muted); text-decoration: none;
+}
+.entry-file-chip:hover { color: var(--ink); border-color: var(--amber); }
 
 /* ---------------- Histórico de progresso (Projetos) ---------------- */
 .progress-log { margin-top: 0.3rem; }
@@ -623,7 +705,7 @@ html[data-theme="light"] .icon-moon { display: block; }
    ========================================================= */
 @media (max-width: 1080px) {
   .dash-grid { grid-template-columns: repeat(2, 1fr); }
-  .dash-card-wide { grid-column: span 2; }
+  .dash-card-span2 { grid-column: span 2; }
 }
 
 @media (max-width: 900px) {
@@ -634,7 +716,7 @@ html[data-theme="light"] .icon-moon { display: block; }
 @media (max-width: 780px) {
   .app-shell { flex-direction: column; }
   .dash-grid { grid-template-columns: 1fr; }
-  .dash-card-wide { grid-column: span 1; }
+  .dash-card-span2 { grid-column: span 1; }
   .rail {
     position: fixed;
     bottom: 0; left: 0; right: 0; top: auto;

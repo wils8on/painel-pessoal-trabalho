@@ -1,9 +1,9 @@
 // =========================================================
-// js/app.js — Nova: Painel Pessoal e de Trabalho
+// js/app.js — Dossiê: Painel Pessoal e de Trabalho
 // Vanilla JS (ES6+) + Firebase v10 (modular SDK)
 // =========================================================
 import { auth, db, googleProvider } from "./firebase-config.js";
-import { uploadImageToCloudinary } from "./cloudinary-config.js";
+import { uploadFileToCloudinary } from "./cloudinary-config.js";
 import {
   signInWithPopup,
   signOut,
@@ -217,51 +217,49 @@ function startAllModules(uid) {
 ========================================================= */
 let diaryItems = [];
 const diaryForm = $("#diario-form-wrap");
-const diaryImageFile = $("#diario-image-file");
-const diaryImageStatus = $("#diario-image-status");
-const diaryImagePreviewWrap = $("#diario-image-preview-wrap");
-const diaryImagePreview = $("#diario-image-preview");
-const diaryImageLabelText = $("#diario-image-label-text");
+const diaryAttachmentsFile = $("#diario-attachments-file");
+const diaryAttachmentsStatus = $("#diario-attachments-status");
+const diaryAttachmentsList = $("#diario-attachments-list");
+let diaryAttachmentsDraft = []; // [{url, name, format, resourceType, bytes}]
 
-function resetDiaryImageField() {
-  $("#diario-image-url").value = "";
-  diaryImageFile.value = "";
-  diaryImagePreviewWrap.classList.add("hidden");
-  diaryImagePreview.src = "";
-  diaryImageStatus.textContent = "";
-  diaryImageLabelText.textContent = "Adicionar imagem de capa";
+function fileIconSvg() {
+  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/></svg>`;
 }
 
-function setDiaryImagePreview(url) {
-  $("#diario-image-url").value = url || "";
-  if (url) {
-    diaryImagePreview.src = url;
-    diaryImagePreviewWrap.classList.remove("hidden");
-    diaryImageLabelText.textContent = "Trocar imagem de capa";
-  } else {
-    diaryImagePreviewWrap.classList.add("hidden");
-    diaryImagePreview.src = "";
-    diaryImageLabelText.textContent = "Adicionar imagem de capa";
-  }
+function renderAttachmentsDraft() {
+  diaryAttachmentsList.innerHTML = diaryAttachmentsDraft.map((att, idx) => `
+    <span class="attachment-chip">
+      ${att.resourceType === "image"
+        ? `<img class="attachment-thumb-mini" src="${att.url}" alt="">`
+        : `<span class="attachment-icon">${fileIconSvg()}</span>`}
+      <span class="attachment-name" title="${escapeHtml(att.name)}">${escapeHtml(att.name)}</span>
+      <button type="button" class="attachment-remove" data-idx="${idx}" title="Remover anexo" aria-label="Remover anexo">×</button>
+    </span>
+  `).join("");
+  $$(".attachment-remove", diaryAttachmentsList).forEach((btn) => btn.addEventListener("click", () => {
+    diaryAttachmentsDraft.splice(Number(btn.dataset.idx), 1);
+    renderAttachmentsDraft();
+  }));
 }
 
-diaryImageFile.addEventListener("change", async () => {
-  const file = diaryImageFile.files[0];
-  if (!file) return;
-  diaryImageStatus.textContent = "Enviando imagem…";
-  try {
-    const url = await uploadImageToCloudinary(file);
-    setDiaryImagePreview(url);
-    diaryImageStatus.textContent = "Imagem enviada ✓";
-    setTimeout(() => { diaryImageStatus.textContent = ""; }, 2500);
-  } catch (err) {
-    console.error(err);
-    diaryImageStatus.textContent = "";
-    alert(err.message || "Não foi possível enviar a imagem.");
-    diaryImageFile.value = "";
+diaryAttachmentsFile.addEventListener("change", async () => {
+  const files = Array.from(diaryAttachmentsFile.files || []);
+  if (!files.length) return;
+  diaryAttachmentsStatus.textContent = files.length > 1 ? `Enviando ${files.length} arquivos…` : "Enviando arquivo…";
+  for (const file of files) {
+    try {
+      const result = await uploadFileToCloudinary(file);
+      diaryAttachmentsDraft.push(result);
+      renderAttachmentsDraft();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || `Não foi possível enviar "${file.name}".`);
+    }
   }
+  diaryAttachmentsStatus.textContent = "Envio concluído ✓";
+  diaryAttachmentsFile.value = "";
+  setTimeout(() => { diaryAttachmentsStatus.textContent = ""; }, 2500);
 });
-$("#diario-image-remove").addEventListener("click", () => setDiaryImagePreview(""));
 
 function populateDiaryBookFilter() {
   const select = $("#diario-filter-book");
@@ -280,7 +278,9 @@ $("#diario-new-btn").addEventListener("click", () => {
   $("#diario-category").value = "Ideia Solta";
   $("#diario-tags").value = "";
   $("#diario-content").value = "";
-  resetDiaryImageField();
+  diaryAttachmentsDraft = [];
+  diaryAttachmentsStatus.textContent = "";
+  renderAttachmentsDraft();
   diaryForm.classList.remove("hidden");
 });
 $("#diario-cancel-btn").addEventListener("click", () => diaryForm.classList.add("hidden"));
@@ -297,7 +297,7 @@ $("#diario-save-btn").addEventListener("click", async () => {
     book: $("#diario-book").value.trim(),
     status: $("#diario-status").value,
     tags,
-    imageUrl: $("#diario-image-url").value || null,
+    attachments: diaryAttachmentsDraft,
   };
   const editId = $("#diario-edit-id").value;
   try {
@@ -331,9 +331,12 @@ function renderDiary(items) {
     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
   $("#diario-empty").classList.toggle("hidden", filtered.length > 0);
-  $("#diario-list").innerHTML = filtered.map((item) => `
+  $("#diario-list").innerHTML = filtered.map((item) => {
+    const atts = item.attachments || [];
+    const images = atts.filter((a) => a.resourceType === "image");
+    const files = atts.filter((a) => a.resourceType !== "image");
+    return `
     <article class="entry-card">
-      ${item.imageUrl ? `<img src="${item.imageUrl}" class="entry-cover" alt="Capa de ${escapeHtml(item.title)}" loading="lazy">` : ""}
       <div class="entry-card-top">
         <span class="entry-tag" style="background:var(--amber-soft); color:var(--amber);">${escapeHtml(item.category)}</span>
         <span class="badge badge-status">${escapeHtml(item.status || "Rascunho")}</span>
@@ -341,13 +344,16 @@ function renderDiary(items) {
       <h3 class="entry-title">${escapeHtml(item.title)}</h3>
       ${item.book ? `<p class="entry-meta"><span>📖 ${escapeHtml(item.book)}</span></p>` : ""}
       <div class="entry-body">${mdToHtml(item.content)}</div>
+      ${images.length ? `<div class="entry-gallery">${images.map((img) => `<a href="${img.url}" target="_blank" rel="noopener"><img src="${img.url}" alt="${escapeHtml(img.name)}" loading="lazy"></a>`).join("")}</div>` : ""}
+      ${files.length ? `<div class="entry-files">${files.map((f) => `<a class="entry-file-chip" href="${f.url}" target="_blank" rel="noopener">${fileIconSvg()} ${escapeHtml(f.name)}</a>`).join("")}</div>` : ""}
       ${(item.tags || []).length ? `<div class="entry-tags">${item.tags.map((t) => `<span class="tag-chip">#${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       <div class="entry-actions">
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
       </div>
     </article>
-  `).join("");
+  `;
+  }).join("");
 
   $$('#diario-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => {
     const item = diaryItems.find((i) => i.id === btn.dataset.id);
@@ -358,8 +364,9 @@ function renderDiary(items) {
     $("#diario-category").value = item.category;
     $("#diario-tags").value = (item.tags || []).join(", ");
     $("#diario-content").value = item.content;
-    setDiaryImagePreview(item.imageUrl || "");
-    diaryImageStatus.textContent = "";
+    diaryAttachmentsDraft = [...(item.attachments || [])];
+    diaryAttachmentsStatus.textContent = "";
+    renderAttachmentsDraft();
     diaryForm.classList.remove("hidden");
   }));
   $$('#diario-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
@@ -917,18 +924,6 @@ function refreshDashboard() {
     </div>
   `).join("");
 
-  // ---- Próximos compromissos ----
-  const nextEvents = upcomingEvents().slice(0, 5);
-  $("#dash-events-empty").classList.toggle("hidden", nextEvents.length > 0);
-  $("#dash-events-list").innerHTML = nextEvents.map((item) => `
-    <div class="list-item">
-      <div class="list-item-main">
-        <span class="list-item-title">${escapeHtml(item.title)}</span>
-        <span class="list-item-date">${fmtDate(new Date(item.date + "T00:00:00"))}</span>
-      </div>
-    </div>
-  `).join("");
-
   // ---- Aniversários próximos ----
   const nextBirthdays = upcomingBirthdays(5);
   $("#dash-birthdays-empty").classList.toggle("hidden", nextBirthdays.length > 0);
@@ -952,6 +947,18 @@ function refreshDashboard() {
     </div>
   `;
   $("#dash-ring-caption").textContent = active.length ? `${active.length} projeto(s) em andamento` : "Nenhum projeto ativo";
+
+  // ---- Progresso individual, por projeto ----
+  const sortedActive = [...active].sort((a, b) => (a.progress || 0) - (b.progress || 0));
+  $("#dash-projects-list").innerHTML = sortedActive.length
+    ? sortedActive.map((p) => `
+        <div class="dash-project-row">
+          <span class="proj-name" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</span>
+          <span class="proj-track"><span class="proj-fill" style="width:${p.progress || 0}%"></span></span>
+          <span class="proj-pct">${p.progress || 0}%</span>
+        </div>
+      `).join("")
+    : `<p class="empty-state small">Cadastre um projeto para acompanhar o progresso aqui.</p>`;
 
   // ---- Resumo do Kanban ----
   const total = kanbanItems.length || 1;
@@ -1009,4 +1016,116 @@ function refreshDashboard() {
       </div>
     `;
   }).join("");
+
+  renderCalendar();
 }
+
+/* =========================================================
+   CALENDÁRIO INTERATIVO — Dashboard
+   Mostra o mês atual (com navegação) e marca com pontinhos os dias
+   que têm evento, aniversário ou prazo de projeto. Passar o mouse
+   mostra um resumo (tooltip nativo); clicar lista os detalhes abaixo.
+========================================================= */
+let calendarViewDate = new Date();
+let selectedCalendarDay = null; // "YYYY-MM-DD"
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+function ymd(y, m, d) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
+
+function getDayInfo(dateObj) {
+  const y = dateObj.getFullYear(), m = dateObj.getMonth(), d = dateObj.getDate();
+  const dateStr = ymd(y, m, d);
+  const events = eventItems.filter((i) => i.date === dateStr);
+  const bdays = birthdayItems.filter((i) => i.day === d && i.month === m + 1);
+  const deadlines = projectItems.filter((i) => i.deadline === dateStr && i.status !== "Concluido");
+  return { events, bdays, deadlines };
+}
+
+function renderDayDetailsPanel(dateObj, info) {
+  const panel = $("#cal-day-details");
+  const total = info.events.length + info.bdays.length + info.deadlines.length;
+  if (!total) { panel.innerHTML = ""; return; }
+  const rows = [
+    ...info.events.map((e) => ({ color: "var(--rust)", label: "Evento", text: e.title })),
+    ...info.bdays.map((b) => ({ color: "var(--plum)", label: "Aniversário", text: `${b.name} 🎂` })),
+    ...info.deadlines.map((p) => ({ color: "var(--teal)", label: "Prazo", text: p.title })),
+  ];
+  panel.innerHTML = `
+    <p class="cal-day-details-title">${fmtDate(dateObj)}</p>
+    ${rows.map((r) => `
+      <div class="cal-day-detail-item">
+        <span class="cal-dot" style="background:${r.color}"></span>
+        <span>${escapeHtml(r.text)}</span>
+        <span style="margin-left:auto; color:var(--ink-faint); font-size:0.7rem;">${r.label}</span>
+      </div>
+    `).join("")}
+  `;
+}
+
+function renderCalendar() {
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth();
+  const label = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(calendarViewDate);
+  $("#cal-month-label").textContent = label.charAt(0).toUpperCase() + label.slice(1);
+
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = firstDay.getDay();
+  const today = new Date();
+  const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
+
+  let cellsHtml = "";
+  for (let i = 0; i < 42; i++) {
+    const cellDate = new Date(year, month, i - startWeekday + 1);
+    const otherMonth = cellDate.getMonth() !== month;
+    const cellStr = ymd(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
+    const info = getDayInfo(cellDate);
+    const hasEvents = info.events.length + info.bdays.length + info.deadlines.length > 0;
+    const isToday = cellStr === todayStr;
+    const isSelected = cellStr === selectedCalendarDay;
+
+    const dots = [
+      info.events.length ? `<span class="cal-dot" style="background:var(--rust)"></span>` : "",
+      info.bdays.length ? `<span class="cal-dot" style="background:var(--plum)"></span>` : "",
+      info.deadlines.length ? `<span class="cal-dot" style="background:var(--teal)"></span>` : "",
+    ].join("");
+
+    const titleParts = [
+      ...info.events.map((e) => e.title),
+      ...info.bdays.map((b) => `${b.name} (aniversário)`),
+      ...info.deadlines.map((p) => `${p.title} (prazo)`),
+    ];
+
+    cellsHtml += `
+      <div class="cal-day ${otherMonth ? "other-month" : ""} ${isToday ? "today" : ""} ${isSelected ? "selected" : ""} ${hasEvents ? "has-events" : ""}"
+           data-date="${cellStr}" ${titleParts.length ? `title="${escapeHtml(titleParts.join(" · "))}"` : ""}>
+        <span>${cellDate.getDate()}</span>
+        <span class="cal-day-dots">${dots}</span>
+      </div>
+    `;
+  }
+  $("#cal-grid").innerHTML = cellsHtml;
+
+  $$(".cal-day.has-events", $("#cal-grid")).forEach((cell) => {
+    cell.addEventListener("click", () => {
+      selectedCalendarDay = cell.dataset.date;
+      renderCalendar();
+    });
+  });
+
+  if (selectedCalendarDay) {
+    const [sy, sm, sd] = selectedCalendarDay.split("-").map(Number);
+    const sDate = new Date(sy, sm - 1, sd);
+    renderDayDetailsPanel(sDate, getDayInfo(sDate));
+  } else {
+    $("#cal-day-details").innerHTML = "";
+  }
+}
+
+$("#cal-prev-btn").addEventListener("click", () => {
+  calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() - 1, 1);
+  renderCalendar();
+});
+$("#cal-next-btn").addEventListener("click", () => {
+  calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 1);
+  renderCalendar();
+});

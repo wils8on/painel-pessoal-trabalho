@@ -25,9 +25,9 @@ personal-dashboard/
 5. Cole esse objeto em `js/firebase-config.js`, substituindo os placeholders.
 6. Em **Authentication > Settings > Authorized domains**, adicione o domínio do seu GitHub Pages, por exemplo `SEUUSUARIO.github.io`.
 
-## 1.1 Cloudinary (upload de imagens no Diário)
+## 1.1 Cloudinary (upload de imagens e arquivos no Diário)
 
-O Diário permite anexar uma imagem de capa a cada anotação. Isso usa sua conta Cloudinary (plano gratuito serve bem):
+O Diário permite anexar **várias imagens e arquivos** (PDF, Word, Excel, txt) a cada anotação. Isso usa sua conta Cloudinary (plano gratuito serve bem):
 
 1. Crie uma conta em https://cloudinary.com se ainda não tiver.
 2. No [Dashboard](https://console.cloudinary.com), copie o **Cloud name**.
@@ -36,7 +36,7 @@ O Diário permite anexar uma imagem de capa a cada anotação. Isso usa sua cont
 5. Recomendado: nesse mesmo preset, defina uma pasta fixa (ex: `nova-app`) e limites de tamanho/formato em "Upload Manipulations" — como o preset unsigned fica exposto no código-fonte, isso evita que alguém use sua conta para hospedar arquivos aleatórios.
 6. Abra `js/cloudinary-config.js` e cole o Cloud name e o nome do preset.
 
-Se você excluir uma anotação do Diário, a imagem correspondente **não é apagada automaticamente do Cloudinary** (o app não usa a API Secret, então não consegue deletar remotamente) — ela só deixa de aparecer no app. Se quiser liberar espaço, apague manualmente pelo [Media Library](https://console.cloudinary.com) do Cloudinary.
+Se você excluir uma anotação do Diário (ou remover um anexo específico antes de salvar), o(s) arquivo(s) correspondente(s) **não são apagados automaticamente do Cloudinary** (o app não usa a API Secret, então não consegue deletar remotamente) — eles só deixam de aparecer no app. Se quiser liberar espaço, apague manualmente pelo [Media Library](https://console.cloudinary.com) do Cloudinary.
 
 ## 2. Regras de segurança do Firestore
 
@@ -101,7 +101,7 @@ Troque `"seuemail@gmail.com"` pelo e-mail da sua conta Google.
 
 | Coleção        | Campos principais                                                                                                      | Módulo                     |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `diaryEntries` | title, category, book, status, tags[], imageUrl, content, userId, createdAt                                            | Diário & Ideias Literárias |
+| `diaryEntries` | title, category, book, status, tags[], attachments[] ({url,name,format,resourceType}), content, userId, createdAt      | Diário & Ideias Literárias |
 | `ahsdNotes`    | dateTime, content, userId, createdAt                                                                                   | Avaliação AH/SD            |
 | `kanbanTasks`  | title, description, status, userId, createdAt                                                                          | Demandas de Trabalho & BI  |
 | `projects`     | title, category, priority, status, start, deadline, description, nextSteps, progress, progressLog[], userId, createdAt | Projetos & Planos          |
