@@ -1,5 +1,5 @@
 // =========================================================
-// js/app.js — DOSSIÊ: Painel Pessoal e de Trabalho
+// js/app.js — DOSSIÊ: Painel Pessoal e de Trabalho.
 // Vanilla JS (ES6+) + Firebase v10 (modular SDK)
 // =========================================================
 import { auth, db, googleProvider } from "./firebase-config.js";

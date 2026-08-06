@@ -1,4 +1,4 @@
-// =========================================================
+// ==========================================================
 // js/cloudinary-config.js
 // Cole aqui os dados da SUA conta Cloudinary (são públicos por natureza —
 // não é preciso, e não é seguro, colocar a "API Secret" no front-end).
@@ -9,7 +9,7 @@
 //    Dica de segurança: como o preset unsigned fica público no código-fonte,
 //    configure nele uma pasta fixa (ex: "nova-app") e um limite de tamanho/
 //    formato em "Upload Manipulations", para evitar abuso da sua conta.
-// =========================================================
+// ==========================================================
 export const CLOUDINARY_CLOUD_NAME = "ffril2cr";
 export const CLOUDINARY_UPLOAD_PRESET = "dossie";
 

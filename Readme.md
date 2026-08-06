@@ -99,16 +99,16 @@ Troque `"seuemail@gmail.com"` pelo e-mail da sua conta Google.
 
 ## Coleções do Firestore usadas pelo app
 
-| Coleção        | Campos principais                                                                                                                                           | Módulo                     |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `diaryEntries` | title, category, book, status, tags[], attachments[] ({url,name,format,resourceType}), content, userId, createdAt                                           | Diário & Ideias Literárias |
-| `ahsdNotes`    | dateTime, content, tags[], userId, createdAt                                                                                                                | Avaliação AH/SD            |
-| `kanbanTasks`  | title, description, status, completedAt, userId, createdAt                                                                                                  | Demandas de Trabalho & BI  |
-| `projects`     | title, category, priority, status, start, deadline, description, nextSteps, progress, progressLog[], completedAt, userId, createdAt                         | Projetos & Planos          |
-| `agendaEvents` | title, date, notes, userId, createdAt                                                                                                                       | Agenda (eventos)           |
-| `birthdays`    | name, day, month, userId, createdAt                                                                                                                         | Agenda (aniversários)      |
+| Coleção        | Campos principais                                                                                                                                                        | Módulo                     |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
+| `diaryEntries` | title, category, book, status, tags[], attachments[] ({url,name,format,resourceType}), content, userId, createdAt                                                        | Diário & Ideias Literárias |
+| `ahsdNotes`    | dateTime, content, tags[], userId, createdAt                                                                                                                             | Avaliação AH/SD            |
+| `kanbanTasks`  | title, description, status, completedAt, userId, createdAt                                                                                                               | Demandas de Trabalho & BI  |
+| `projects`     | title, category, priority, status, start, deadline, description, nextSteps, progress, progressLog[], completedAt, userId, createdAt                                      | Projetos & Planos          |
+| `agendaEvents` | title, date, notes, userId, createdAt                                                                                                                                    | Agenda (eventos)           |
+| `birthdays`    | name, day, month, userId, createdAt                                                                                                                                      | Agenda (aniversários)      |
 | `goals`        | title, category, priority, status, deadline, description, progress, progressLog[], completedAt, linkedProjectIds[], linkedTaskIds[], linkedHabitIds[], userId, createdAt | Metas                      |
-| `habits`       | title, emoji, frequency (diario/semanal/mensal), target, completions[] (datas "YYYY-MM-DD"), notes, userId, createdAt                                       | Hábitos                    |
+| `habits`       | title, emoji, frequency (diario/semanal/mensal), target, completions[] (datas "YYYY-MM-DD"), notes, userId, createdAt                                                    | Hábitos                    |
 
 `progressLog` é um array de objetos `{ date, percent, note }` — cada vez que você registra uma atualização de progresso (pelo card ou editando o formulário), uma entrada é adicionada, formando um histórico de acompanhamento. O mesmo padrão vale para Projetos e para Metas.
 
