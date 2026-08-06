@@ -118,3 +118,27 @@ Todas as coleções são criadas automaticamente pelo Firestore na primeira grav
 - Navegação desenhada como abas de divisória de fichário: cada módulo tem um código de 3 letras (DIA, AHS, BI, PRJ, AGN) e uma cor própria. No mobile a barra de abas fixa na parte inferior da tela.
 - O editor do Diário aceita uma sintaxe leve de Markdown: `# título`, `**negrito**`, `*itálico*` e listas com `- item`.
 - Todas as consultas ao Firestore filtram apenas por `userId` (sem `orderBy` composto), e a ordenação final é feita no navegador — isso evita a necessidade de criar índices compostos manualmente no console do Firebase.
+
+## Roadmap — "Life OS" (Fase 1 concluída)
+
+O pedido de evolução para um "Life OS" completo tinha 17 frentes. Implementamos a **Fase 1**, focada em tornar o que já existe mais inteligente e conectado, sem alterar a estrutura principal:
+
+- ✅ **Busca Global (Ctrl+K)** — localiza instantaneamente qualquer item em Diário, AH/SD, Demandas, Projetos, Agenda e Aniversários, com atalhos de criação rápida.
+- ✅ **Resumo do Dia** — card no Dashboard com mensagens contextuais (demandas pendentes, projetos parados, próximo aniversário/prazo, últimas anotações) e uma sugestão automática de prioridade.
+- ✅ **Atividade Geral** — nova aba com timeline cronológica completa de tudo que foi criado/editado, com busca, filtro por categoria e clique para abrir o registro original.
+- ✅ **Marcadores comportamentais no AH/SD** — 12 tags predefinidas, gráfico de frequência dos padrões mais comuns e busca/filtro por tag.
+- ✅ **Notificações toast** — feedback visual de sucesso/erro substituindo os `alert()` nativos.
+
+**Ainda não implementado** (fica como próximas fases, para não comprometer a qualidade em uma única entrega):
+
+- Tela de **Insights** com estatísticas e gráficos (produtividade, tempo médio de conclusão, evolução mensal etc.)
+- Campos avançados em **Projetos** (horas gastas, checklist, links úteis, riscos, dependências, "próxima ação")
+- Evolução de **Demandas** para visual Trello/Linear (esforço, etiquetas, recorrência, comentários)
+- Campos de contexto no **Diário** (humor, energia, sono, local, clima) e editor Markdown completo
+- Evolução de **Ideias Literárias** (status, tipo, vínculos com personagens/livros/universos)
+- Evolução de **Aniversários** para cadastro completo de **Pessoas** (foto, contato, redes sociais, histórico)
+- Telas novas de **Metas** e **Hábitos** (streaks, calendário, gráficos)
+- Widgets visuais extras no Dashboard (mapa de calor, gráficos semanais/mensais)
+- Melhorias de UX mais amplas (drag-and-drop generalizado, skeleton loading, menus de contexto, atalhos adicionais)
+
+Cada uma dessas frentes pode ser pedida como uma próxima fase separada.

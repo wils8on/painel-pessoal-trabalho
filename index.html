@@ -46,6 +46,10 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>
     </div>
 
+    <button class="icon-btn rail-search-btn" id="global-search-btn" title="Buscar em tudo (Ctrl+K)" aria-label="Busca global">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    </button>
+
     <button class="rail-btn active" data-view="dashboard" data-accent="primary" title="Início" aria-label="Início">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/></svg>
       <span class="rail-label">Início</span>
@@ -69,6 +73,10 @@
     <button class="rail-btn" data-view="agenda" data-accent="rust" title="Agenda &amp; Aniversários" aria-label="Agenda e Aniversários">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/><circle cx="8.3" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.7" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg>
       <span class="rail-label">Agenda</span>
+    </button>
+    <button class="rail-btn" data-view="atividade" data-accent="primary" title="Atividade Geral" aria-label="Linha do tempo de atividade geral">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+      <span class="rail-label">Atividade</span>
     </button>
 
     <div class="rail-footer">
@@ -101,6 +109,14 @@
       </header>
 
       <div class="stat-strip" id="dash-stats"></div>
+
+      <div class="glass-card daily-brief-card">
+        <div class="glass-card-head daily-brief-head">
+          <h3>Resumo do Dia</h3>
+          <span class="daily-brief-tag">seu assistente pessoal</span>
+        </div>
+        <div id="daily-brief-list" class="daily-brief-list"></div>
+      </div>
 
       <div class="dash-grid">
         <div class="glass-card dash-card dash-card-span2 dash-card-calendar">
@@ -255,10 +271,20 @@
         <input type="hidden" id="ahsd-edit-id" />
         <input type="datetime-local" id="ahsd-datetime" class="input mono" />
         <textarea id="ahsd-content" class="input textarea" rows="8" placeholder="Observações, insights, comportamentos observados…"></textarea>
+        <p class="field-hint">Marcadores comportamentais observados (opcional):</p>
+        <div class="tag-toggle-group" id="ahsd-tag-toggle-group"></div>
         <div class="form-actions">
           <button class="btn btn-ghost" id="ahsd-cancel-btn">Cancelar</button>
           <button class="btn btn-primary" data-accent="plum" id="ahsd-save-btn">Salvar</button>
         </div>
+      </div>
+
+      <div class="glass-card tag-freq-card" id="ahsd-tag-freq-card">
+        <div class="glass-card-head tag-freq-head">
+          <h3>Padrões mais frequentes</h3>
+          <button type="button" class="btn btn-ghost btn-sm hidden" id="ahsd-tag-clear-btn">Limpar filtro ✕</button>
+        </div>
+        <div id="ahsd-tag-freq-list" class="tag-freq-list"></div>
       </div>
 
       <div id="ahsd-list" class="timeline"></div>
@@ -455,8 +481,57 @@
       </div>
     </section>
 
+    <!-- VIEW 6 — Atividade Geral (timeline) -->
+    <section class="view" id="view-atividade" data-accent="primary">
+      <header class="view-header">
+        <div class="view-header-title">
+          <span class="view-icon" data-accent="primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+          </span>
+          <h2 class="view-title">Atividade Geral</h2>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <input type="search" id="atividade-search" class="input" placeholder="Buscar na atividade…" />
+        <select id="atividade-filter-type" class="input select">
+          <option value="">Todas as categorias</option>
+          <option value="diario">Diário</option>
+          <option value="ahsd">AH/SD</option>
+          <option value="kanban">Demandas</option>
+          <option value="projeto">Projetos</option>
+          <option value="evento">Agenda</option>
+          <option value="niver">Aniversários</option>
+        </select>
+      </div>
+
+      <div id="atividade-list" class="activity-list activity-list-full"></div>
+      <p class="empty-state" id="atividade-empty">Assim que você começar a usar o Nova, tudo o que acontecer aparece aqui, em ordem cronológica.</p>
+    </section>
+
   </main>
 </div>
+
+<!-- ===================== BUSCA GLOBAL (Ctrl+K) ===================== -->
+<div class="cmdk-overlay hidden" id="cmdk-overlay">
+  <div class="cmdk-modal glass-card">
+    <div class="cmdk-input-row">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="cmdk-input" class="cmdk-input" placeholder="Buscar projetos, demandas, diário, pessoas, datas…" autocomplete="off" />
+      <kbd class="cmdk-esc">Esc</kbd>
+    </div>
+    <div class="cmdk-quick-actions" id="cmdk-quick-actions"></div>
+    <div class="cmdk-results" id="cmdk-results"></div>
+    <div class="cmdk-footer">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
+      <span><kbd>Enter</kbd> abrir</span>
+      <span><kbd>Ctrl</kbd>+<kbd>K</kbd> alternar</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== TOASTS ===================== -->
+<div class="toast-container" id="toast-container"></div>
 
 <script type="module" src="js/app.js"></script>
 </body>

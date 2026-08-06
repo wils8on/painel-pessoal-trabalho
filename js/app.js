@@ -1,5 +1,5 @@
 // =========================================================
-// js/app.js — Dossiê: Painel Pessoal e de Trabalho
+// js/app.js — Nova: Painel Pessoal e de Trabalho
 // Vanilla JS (ES6+) + Firebase v10 (modular SDK)
 // =========================================================
 import { auth, db, googleProvider } from "./firebase-config.js";
@@ -87,6 +87,21 @@ function relativeTime(date) {
   const days = Math.round(hrs / 24);
   if (days < 30) return `há ${days} d`;
   return fmtDate(date);
+}
+
+/* ---------------------------------------------------------
+   Toasts — feedback visual de sucesso/erro
+--------------------------------------------------------- */
+const toastContainer = $("#toast-container");
+function showToast(message, type = "success") {
+  const el = document.createElement("div");
+  el.className = `toast toast-${type}`;
+  el.textContent = message;
+  toastContainer.appendChild(el);
+  setTimeout(() => {
+    el.classList.add("toast-hide");
+    setTimeout(() => el.remove(), 250);
+  }, 2800);
 }
 
 /* ---------------------------------------------------------
@@ -253,7 +268,7 @@ diaryAttachmentsFile.addEventListener("change", async () => {
       renderAttachmentsDraft();
     } catch (err) {
       console.error(err);
-      alert(err.message || `Não foi possível enviar "${file.name}".`);
+      showToast(err.message || `Não foi possível enviar "${file.name}".`, "error");
     }
   }
   diaryAttachmentsStatus.textContent = "Envio concluído ✓";
@@ -288,7 +303,7 @@ $("#diario-cancel-btn").addEventListener("click", () => diaryForm.classList.add(
 $("#diario-save-btn").addEventListener("click", async () => {
   const title = $("#diario-title").value.trim();
   const content = $("#diario-content").value.trim();
-  if (!title || !content) return alert("Preencha título e conteúdo.");
+  if (!title || !content) return showToast("Preencha título e conteúdo.", "error");
   const tags = $("#diario-tags").value.split(",").map((t) => t.trim()).filter(Boolean);
   const payload = {
     title,
@@ -304,15 +319,33 @@ $("#diario-save-btn").addEventListener("click", async () => {
     if (editId) await diaryApi.update(editId, payload);
     else await diaryApi.add(currentUser.uid, payload);
     diaryForm.classList.add("hidden");
+    showToast(editId ? "Anotação atualizada." : "Anotação salva.");
   } catch (err) {
     console.error(err);
-    alert("Não foi possível salvar. Tente novamente.");
+    showToast("Não foi possível salvar. Tente novamente.", "error");
   }
 });
 
 $("#diario-search").addEventListener("input", () => renderDiary());
 $("#diario-filter-cat").addEventListener("change", () => renderDiary());
 $("#diario-filter-book").addEventListener("change", () => renderDiary());
+
+function openDiaryEntry(id) {
+  const item = diaryItems.find((i) => i.id === id);
+  if (!item) return;
+  switchView("diario");
+  $("#diario-edit-id").value = item.id;
+  $("#diario-title").value = item.title;
+  $("#diario-book").value = item.book || "";
+  $("#diario-status").value = item.status || "Rascunho";
+  $("#diario-category").value = item.category;
+  $("#diario-tags").value = (item.tags || []).join(", ");
+  $("#diario-content").value = item.content;
+  diaryAttachmentsDraft = [...(item.attachments || [])];
+  diaryAttachmentsStatus.textContent = "";
+  renderAttachmentsDraft();
+  diaryForm.classList.remove("hidden");
+}
 
 function renderDiary(items) {
   if (items) diaryItems = items;
@@ -355,22 +388,9 @@ function renderDiary(items) {
   `;
   }).join("");
 
-  $$('#diario-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => {
-    const item = diaryItems.find((i) => i.id === btn.dataset.id);
-    $("#diario-edit-id").value = item.id;
-    $("#diario-title").value = item.title;
-    $("#diario-book").value = item.book || "";
-    $("#diario-status").value = item.status || "Rascunho";
-    $("#diario-category").value = item.category;
-    $("#diario-tags").value = (item.tags || []).join(", ");
-    $("#diario-content").value = item.content;
-    diaryAttachmentsDraft = [...(item.attachments || [])];
-    diaryAttachmentsStatus.textContent = "";
-    renderAttachmentsDraft();
-    diaryForm.classList.remove("hidden");
-  }));
+  $$('#diario-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openDiaryEntry(btn.dataset.id)));
   $$('#diario-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
-    if (confirm("Excluir esta anotação?")) diaryApi.remove(btn.dataset.id);
+    if (confirm("Excluir esta anotação?")) { diaryApi.remove(btn.dataset.id); showToast("Anotação excluída."); }
   }));
 
   refreshDashboard();
@@ -382,6 +402,26 @@ function renderDiary(items) {
 let ahsdItems = [];
 const ahsdForm = $("#ahsd-form-wrap");
 
+const AHSD_TAGS = [
+  "Hiperfoco", "Criatividade", "Sensibilidade", "Sobrecarga", "Comunicação",
+  "Rigidez", "Máscara Social", "Memória", "Ansiedade", "Interesse específico",
+  "Organização", "Socialização",
+];
+let ahsdTagsDraft = [];
+let ahsdActiveTagFilter = null;
+
+function renderAhsdTagToggles() {
+  $("#ahsd-tag-toggle-group").innerHTML = AHSD_TAGS.map((tag) => `
+    <button type="button" class="tag-toggle ${ahsdTagsDraft.includes(tag) ? "active" : ""}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>
+  `).join("");
+  $$(".tag-toggle", $("#ahsd-tag-toggle-group")).forEach((btn) => btn.addEventListener("click", () => {
+    const tag = btn.dataset.tag;
+    if (ahsdTagsDraft.includes(tag)) ahsdTagsDraft = ahsdTagsDraft.filter((t) => t !== tag);
+    else ahsdTagsDraft.push(tag);
+    renderAhsdTagToggles();
+  }));
+}
+
 function nowForDatetimeLocal() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -392,6 +432,8 @@ $("#ahsd-new-btn").addEventListener("click", () => {
   $("#ahsd-edit-id").value = "";
   $("#ahsd-datetime").value = nowForDatetimeLocal();
   $("#ahsd-content").value = "";
+  ahsdTagsDraft = [];
+  renderAhsdTagToggles();
   ahsdForm.classList.remove("hidden");
 });
 $("#ahsd-cancel-btn").addEventListener("click", () => ahsdForm.classList.add("hidden"));
@@ -399,26 +441,72 @@ $("#ahsd-cancel-btn").addEventListener("click", () => ahsdForm.classList.add("hi
 $("#ahsd-save-btn").addEventListener("click", async () => {
   const content = $("#ahsd-content").value.trim();
   const dateTime = $("#ahsd-datetime").value;
-  if (!content || !dateTime) return alert("Preencha data/hora e observação.");
-  const payload = { content, dateTime };
+  if (!content || !dateTime) return showToast("Preencha data/hora e observação.", "error");
+  const payload = { content, dateTime, tags: ahsdTagsDraft };
   const editId = $("#ahsd-edit-id").value;
   try {
     if (editId) await ahsdApi.update(editId, payload);
     else await ahsdApi.add(currentUser.uid, payload);
     ahsdForm.classList.add("hidden");
+    showToast(editId ? "Registro atualizado." : "Registro salvo.");
   } catch (err) {
     console.error(err);
-    alert("Não foi possível salvar. Tente novamente.");
+    showToast("Não foi possível salvar. Tente novamente.", "error");
   }
 });
 
 $("#ahsd-search").addEventListener("input", () => renderAhsd());
+$("#ahsd-tag-clear-btn").addEventListener("click", () => {
+  ahsdActiveTagFilter = null;
+  renderAhsd();
+});
+
+function openAhsdEntry(id) {
+  const item = ahsdItems.find((i) => i.id === id);
+  if (!item) return;
+  switchView("ahsd");
+  $("#ahsd-edit-id").value = item.id;
+  $("#ahsd-datetime").value = item.dateTime;
+  $("#ahsd-content").value = item.content;
+  ahsdTagsDraft = [...(item.tags || [])];
+  renderAhsdTagToggles();
+  ahsdForm.classList.remove("hidden");
+}
+
+function renderAhsdTagFrequency() {
+  const counts = {};
+  AHSD_TAGS.forEach((t) => { counts[t] = 0; });
+  ahsdItems.forEach((item) => (item.tags || []).forEach((t) => { if (counts[t] !== undefined) counts[t]++; }));
+  const max = Math.max(1, ...Object.values(counts));
+  const sortedTags = [...AHSD_TAGS].sort((a, b) => counts[b] - counts[a]).filter((t) => counts[t] > 0);
+
+  $("#ahsd-tag-clear-btn").classList.toggle("hidden", !ahsdActiveTagFilter);
+
+  if (!sortedTags.length) {
+    $("#ahsd-tag-freq-list").innerHTML = `<p class="empty-state small">Adicione marcadores aos registros para ver os padrões mais frequentes aqui.</p>`;
+    return;
+  }
+  $("#ahsd-tag-freq-list").innerHTML = sortedTags.map((tag) => `
+    <div class="tag-freq-row ${ahsdActiveTagFilter === tag ? "active" : ""}" data-tag="${escapeHtml(tag)}">
+      <span class="tag-freq-name">${escapeHtml(tag)}</span>
+      <span class="tag-freq-track"><span class="tag-freq-fill" style="width:${(counts[tag] / max) * 100}%"></span></span>
+      <span class="tag-freq-count">${counts[tag]}</span>
+    </div>
+  `).join("");
+  $$(".tag-freq-row", $("#ahsd-tag-freq-list")).forEach((row) => row.addEventListener("click", () => {
+    const tag = row.dataset.tag;
+    ahsdActiveTagFilter = ahsdActiveTagFilter === tag ? null : tag;
+    renderAhsd();
+  }));
+}
 
 function renderAhsd(items) {
   if (items) ahsdItems = items;
+  renderAhsdTagFrequency();
   const search = $("#ahsd-search").value.toLowerCase();
   const filtered = ahsdItems
     .filter((i) => !search || i.content.toLowerCase().includes(search))
+    .filter((i) => !ahsdActiveTagFilter || (i.tags || []).includes(ahsdActiveTagFilter))
     .sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
 
   $("#ahsd-empty").classList.toggle("hidden", filtered.length > 0);
@@ -426,6 +514,7 @@ function renderAhsd(items) {
     <div class="timeline-item">
       <div class="timeline-date">${fmtDateTime(new Date(item.dateTime))}</div>
       <p class="timeline-text">${escapeHtml(item.content)}</p>
+      ${(item.tags || []).length ? `<div class="timeline-tags">${item.tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       <div class="timeline-actions">
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
@@ -433,15 +522,9 @@ function renderAhsd(items) {
     </div>
   `).join("");
 
-  $$('#ahsd-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => {
-    const item = ahsdItems.find((i) => i.id === btn.dataset.id);
-    $("#ahsd-edit-id").value = item.id;
-    $("#ahsd-datetime").value = item.dateTime;
-    $("#ahsd-content").value = item.content;
-    ahsdForm.classList.remove("hidden");
-  }));
+  $$('#ahsd-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openAhsdEntry(btn.dataset.id)));
   $$('#ahsd-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
-    if (confirm("Excluir este registro?")) ahsdApi.remove(btn.dataset.id);
+    if (confirm("Excluir este registro?")) { ahsdApi.remove(btn.dataset.id); showToast("Registro excluído."); }
   }));
 
   refreshDashboard();
@@ -463,18 +546,29 @@ $("#kanban-cancel-btn").addEventListener("click", () => kanbanForm.classList.add
 
 $("#kanban-save-btn").addEventListener("click", async () => {
   const title = $("#kanban-title").value.trim();
-  if (!title) return alert("Informe um título para a demanda.");
+  if (!title) return showToast("Informe um título para a demanda.", "error");
   const payload = { title, description: $("#kanban-desc").value.trim() };
   const editId = $("#kanban-edit-id").value;
   try {
     if (editId) await kanbanApi.update(editId, payload);
     else await kanbanApi.add(currentUser.uid, { ...payload, status: "todo" });
     kanbanForm.classList.add("hidden");
+    showToast(editId ? "Demanda atualizada." : "Demanda criada.");
   } catch (err) {
     console.error(err);
-    alert("Não foi possível salvar. Tente novamente.");
+    showToast("Não foi possível salvar. Tente novamente.", "error");
   }
 });
+
+function openKanbanTask(id) {
+  const item = kanbanItems.find((i) => i.id === id);
+  if (!item) return;
+  switchView("kanban");
+  $("#kanban-edit-id").value = item.id;
+  $("#kanban-title").value = item.title;
+  $("#kanban-desc").value = item.description || "";
+  kanbanForm.classList.remove("hidden");
+}
 
 function renderKanban(items) {
   if (items) kanbanItems = items;
@@ -502,15 +596,11 @@ function renderKanban(items) {
   });
   $$('.kanban-card [data-action="edit"]').forEach((btn) => btn.addEventListener("click", (e) => {
     e.stopPropagation();
-    const item = kanbanItems.find((i) => i.id === btn.dataset.id);
-    $("#kanban-edit-id").value = item.id;
-    $("#kanban-title").value = item.title;
-    $("#kanban-desc").value = item.description || "";
-    kanbanForm.classList.remove("hidden");
+    openKanbanTask(btn.dataset.id);
   }));
   $$('.kanban-card [data-action="delete"]').forEach((btn) => btn.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (confirm("Excluir esta demanda?")) kanbanApi.remove(btn.dataset.id);
+    if (confirm("Excluir esta demanda?")) { kanbanApi.remove(btn.dataset.id); showToast("Demanda excluída."); }
   }));
 
   refreshDashboard();
@@ -559,7 +649,7 @@ $("#projeto-filter-status").addEventListener("change", () => renderProjects());
 
 $("#projeto-save-btn").addEventListener("click", async () => {
   const title = $("#projeto-title").value.trim();
-  if (!title) return alert("Informe o nome do projeto.");
+  if (!title) return showToast("Informe o nome do projeto.", "error");
   const newProgress = Number($("#projeto-progress").value);
   const editId = $("#projeto-edit-id").value;
   const existing = editId ? projectItems.find((i) => i.id === editId) : null;
@@ -587,9 +677,10 @@ $("#projeto-save-btn").addEventListener("click", async () => {
     if (editId) await projectsApi.update(editId, payload);
     else await projectsApi.add(currentUser.uid, payload);
     projetoForm.classList.add("hidden");
+    showToast(editId ? "Projeto atualizado." : "Projeto criado.");
   } catch (err) {
     console.error(err);
-    alert("Não foi possível salvar. Tente novamente.");
+    showToast("Não foi possível salvar. Tente novamente.", "error");
   }
 });
 
@@ -602,10 +693,29 @@ async function quickUpdateProgress(id, percent, note) {
   const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: clamped, note: note?.trim() || "" }];
   try {
     await projectsApi.update(id, { progress: clamped, progressLog: log });
+    showToast("Progresso atualizado.");
   } catch (err) {
     console.error(err);
-    alert("Não foi possível registrar a atualização. Tente novamente.");
+    showToast("Não foi possível registrar a atualização. Tente novamente.", "error");
   }
+}
+
+function openProjectEntry(id) {
+  const item = projectItems.find((i) => i.id === id);
+  if (!item) return;
+  switchView("projetos");
+  $("#projeto-edit-id").value = item.id;
+  $("#projeto-title").value = item.title;
+  $("#projeto-category").value = item.category || "Sistema/TI";
+  $("#projeto-priority").value = item.priority || "Media";
+  $("#projeto-status").value = item.status || "Planejamento";
+  $("#projeto-start").value = item.start || "";
+  $("#projeto-deadline").value = item.deadline || "";
+  $("#projeto-desc").value = item.description || "";
+  $("#projeto-next").value = item.nextSteps || "";
+  $("#projeto-progress").value = item.progress || 0;
+  $("#projeto-progress-value").textContent = item.progress || 0;
+  projetoForm.classList.remove("hidden");
 }
 
 function renderProjects(items) {
@@ -686,23 +796,9 @@ function renderProjects(items) {
     const note = $(`#quick-note-${id}`).value;
     await quickUpdateProgress(id, percent, note);
   }));
-  $$('#projeto-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => {
-    const item = projectItems.find((i) => i.id === btn.dataset.id);
-    $("#projeto-edit-id").value = item.id;
-    $("#projeto-title").value = item.title;
-    $("#projeto-category").value = item.category || "Sistema/TI";
-    $("#projeto-priority").value = item.priority || "Media";
-    $("#projeto-status").value = item.status || "Planejamento";
-    $("#projeto-start").value = item.start || "";
-    $("#projeto-deadline").value = item.deadline || "";
-    $("#projeto-desc").value = item.description || "";
-    $("#projeto-next").value = item.nextSteps || "";
-    $("#projeto-progress").value = item.progress || 0;
-    $("#projeto-progress-value").textContent = item.progress || 0;
-    projetoForm.classList.remove("hidden");
-  }));
+  $$('#projeto-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openProjectEntry(btn.dataset.id)));
   $$('#projeto-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
-    if (confirm("Excluir este projeto?")) projectsApi.remove(btn.dataset.id);
+    if (confirm("Excluir este projeto?")) { projectsApi.remove(btn.dataset.id); showToast("Projeto excluído."); }
   }));
 
   refreshDashboard();
@@ -739,22 +835,34 @@ $("#evento-cancel-btn").addEventListener("click", () => eventoForm.classList.add
 $("#evento-save-btn").addEventListener("click", async () => {
   const title = $("#evento-title").value.trim();
   const date = $("#evento-date").value;
-  if (!title || !date) return alert("Preencha título e data do evento.");
+  if (!title || !date) return showToast("Preencha título e data do evento.", "error");
   const payload = { title, date, notes: $("#evento-notes").value.trim() };
   const editId = $("#evento-edit-id").value;
   try {
     if (editId) await eventsApi.update(editId, payload);
     else await eventsApi.add(currentUser.uid, payload);
     eventoForm.classList.add("hidden");
+    showToast(editId ? "Evento atualizado." : "Evento criado.");
   } catch (err) {
     console.error(err);
-    alert("Não foi possível salvar. Tente novamente.");
+    showToast("Não foi possível salvar. Tente novamente.", "error");
   }
 });
 
 function upcomingEvents() {
   const todayStr = new Date().toISOString().slice(0, 10);
   return eventItems.filter((i) => i.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function openEventEntry(id) {
+  const item = eventItems.find((i) => i.id === id);
+  if (!item) return;
+  switchView("agenda");
+  $("#evento-edit-id").value = item.id;
+  $("#evento-title").value = item.title;
+  $("#evento-date").value = item.date;
+  $("#evento-notes").value = item.notes || "";
+  eventoForm.classList.remove("hidden");
 }
 
 function renderEvents(items) {
@@ -775,16 +883,9 @@ function renderEvents(items) {
     </div>
   `).join("");
 
-  $$('#evento-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => {
-    const item = eventItems.find((i) => i.id === btn.dataset.id);
-    $("#evento-edit-id").value = item.id;
-    $("#evento-title").value = item.title;
-    $("#evento-date").value = item.date;
-    $("#evento-notes").value = item.notes || "";
-    eventoForm.classList.remove("hidden");
-  }));
+  $$('#evento-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openEventEntry(btn.dataset.id)));
   $$('#evento-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
-    if (confirm("Excluir este evento?")) eventsApi.remove(btn.dataset.id);
+    if (confirm("Excluir este evento?")) { eventsApi.remove(btn.dataset.id); showToast("Evento excluído."); }
   }));
 
   refreshDashboard();
@@ -803,16 +904,17 @@ $("#niver-save-btn").addEventListener("click", async () => {
   const name = $("#niver-name").value.trim();
   const day = Number($("#niver-day").value);
   const month = Number($("#niver-month").value);
-  if (!name || !day || !month) return alert("Preencha nome, dia e mês.");
+  if (!name || !day || !month) return showToast("Preencha nome, dia e mês.", "error");
   const payload = { name, day, month };
   const editId = $("#niver-edit-id").value;
   try {
     if (editId) await birthdaysApi.update(editId, payload);
     else await birthdaysApi.add(currentUser.uid, payload);
     niverForm.classList.add("hidden");
+    showToast(editId ? "Aniversário atualizado." : "Aniversário salvo.");
   } catch (err) {
     console.error(err);
-    alert("Não foi possível salvar. Tente novamente.");
+    showToast("Não foi possível salvar. Tente novamente.", "error");
   }
 });
 
@@ -845,6 +947,17 @@ function upcomingBirthdays(limit = 100) {
     .slice(0, limit);
 }
 
+function openBirthdayEntry(id) {
+  const item = birthdayItems.find((i) => i.id === id);
+  if (!item) return;
+  switchView("agenda");
+  $("#niver-edit-id").value = item.id;
+  $("#niver-name").value = item.name;
+  $("#niver-day").value = String(item.day);
+  $("#niver-month").value = String(item.month);
+  niverForm.classList.remove("hidden");
+}
+
 function renderBirthdays(items) {
   if (items) birthdayItems = items;
   const monthFilter = $("#niver-filter-month").value;
@@ -871,16 +984,9 @@ function renderBirthdays(items) {
   `;
   }).join("");
 
-  $$('#niver-tbody [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => {
-    const item = birthdayItems.find((i) => i.id === btn.dataset.id);
-    $("#niver-edit-id").value = item.id;
-    $("#niver-name").value = item.name;
-    $("#niver-day").value = String(item.day);
-    $("#niver-month").value = String(item.month);
-    niverForm.classList.remove("hidden");
-  }));
+  $$('#niver-tbody [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openBirthdayEntry(btn.dataset.id)));
   $$('#niver-tbody [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
-    if (confirm("Excluir este aniversário?")) birthdaysApi.remove(btn.dataset.id);
+    if (confirm("Excluir este aniversário?")) { birthdaysApi.remove(btn.dataset.id); showToast("Aniversário excluído."); }
   }));
 
   refreshDashboard();
@@ -996,29 +1102,300 @@ function refreshDashboard() {
   `).join("");
 
   // ---- Atividade recente ----
-  const activity = [
-    ...diaryItems.map((i) => ({ type: "diario", title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
-    ...ahsdItems.map((i) => ({ type: "ahsd", title: i.content.slice(0, 40), ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
-    ...kanbanItems.map((i) => ({ type: "kanban", title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
-    ...projectItems.map((i) => ({ type: "projeto", title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
-    ...eventItems.map((i) => ({ type: "evento", title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
-    ...birthdayItems.map((i) => ({ type: "niver", title: i.name, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
-  ].filter((i) => i.ts).sort((a, b) => b.ts - a.ts).slice(0, 8);
-
+  const activity = buildActivityFeed({ limit: 8 });
   $("#dash-activity-empty").classList.toggle("hidden", activity.length > 0);
-  $("#dash-activity-list").innerHTML = activity.map((item) => {
-    const meta = ACTIVITY_META[item.type];
+  $("#dash-activity-list").innerHTML = activity.map(renderActivityRow).join("");
+  attachActivityClickHandlers("#dash-activity-list");
+
+  renderCalendar();
+  renderDailyBrief();
+  renderAtividade();
+}
+
+/* =========================================================
+   ATIVIDADE GERAL — feed cronológico reutilizável (Dashboard + view própria)
+========================================================= */
+function buildActivityFeed({ limit = null, typeFilter = "", search = "" } = {}) {
+  const term = search.toLowerCase();
+  let activity = [
+    ...diaryItems.map((i) => ({ type: "diario", id: i.id, title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...ahsdItems.map((i) => ({ type: "ahsd", id: i.id, title: i.content.slice(0, 60), ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...kanbanItems.map((i) => ({ type: "kanban", id: i.id, title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...projectItems.map((i) => ({ type: "projeto", id: i.id, title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...eventItems.map((i) => ({ type: "evento", id: i.id, title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...birthdayItems.map((i) => ({ type: "niver", id: i.id, title: i.name, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+  ].filter((i) => i.ts);
+
+  if (typeFilter) activity = activity.filter((i) => i.type === typeFilter);
+  if (term) activity = activity.filter((i) => i.title.toLowerCase().includes(term));
+
+  activity.sort((a, b) => b.ts - a.ts);
+  return limit ? activity.slice(0, limit) : activity;
+}
+
+function renderActivityRow(item) {
+  const meta = ACTIVITY_META[item.type];
+  return `
+    <div class="activity-row" data-type="${item.type}" data-id="${item.id}">
+      <span class="activity-tag" style="background:${meta.bg}; color:${meta.color};">${meta.label}</span>
+      <span class="activity-text">${escapeHtml(item.title)}</span>
+      <span class="activity-time">${relativeTime(item.ts)}</span>
+    </div>
+  `;
+}
+
+function attachActivityClickHandlers(containerSelector) {
+  $$(`${containerSelector} .activity-row`).forEach((row) => row.addEventListener("click", () => openActivityItem(row.dataset.type, row.dataset.id)));
+}
+
+// Dispatcher único: abre o registro correspondente no módulo certo, a partir
+// da Atividade Geral, do Dashboard ou da Busca Global.
+function openActivityItem(type, id) {
+  switch (type) {
+    case "diario": openDiaryEntry(id); break;
+    case "ahsd": openAhsdEntry(id); break;
+    case "kanban": openKanbanTask(id); break;
+    case "projeto": openProjectEntry(id); break;
+    case "evento": openEventEntry(id); break;
+    case "niver": openBirthdayEntry(id); break;
+  }
+}
+
+$("#atividade-search").addEventListener("input", () => renderAtividade());
+$("#atividade-filter-type").addEventListener("change", () => renderAtividade());
+
+function renderAtividade() {
+  if (!currentUser) return;
+  const search = $("#atividade-search").value;
+  const typeFilter = $("#atividade-filter-type").value;
+  const activity = buildActivityFeed({ typeFilter, search });
+  $("#atividade-empty").classList.toggle("hidden", activity.length > 0);
+  $("#atividade-list").innerHTML = activity.map(renderActivityRow).join("");
+  attachActivityClickHandlers("#atividade-list");
+}
+
+/* =========================================================
+   RESUMO DO DIA — mensagens contextuais estilo assistente pessoal
+========================================================= */
+function buildDailyBrief() {
+  const items = [];
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Demandas pendentes
+  const todoCount = kanbanItems.filter((i) => (i.status || "todo") === "todo").length;
+  const doingCount = kanbanItems.filter((i) => i.status === "doing").length;
+  const totalOpen = todoCount + doingCount;
+  if (totalOpen > 0) {
+    items.push({ icon: "📋", text: `Você tem <strong>${totalOpen} demanda(s)</strong> em aberto (${todoCount} para fazer, ${doingCount} em progresso).` });
+  } else {
+    items.push({ icon: "✅", text: "Nenhuma demanda pendente no momento." });
+  }
+
+  // Projetos parados: status "Pausado" ou sem atualização de progresso há 14+ dias
+  const STALL_DAYS = 14;
+  const now = Date.now();
+  const stalledProjects = projectItems.filter((p) => {
+    if (p.status === "Concluido") return false;
+    if (p.status === "Pausado") return true;
+    const log = p.progressLog || [];
+    const lastDate = log.length ? new Date(log[log.length - 1].date) : tsToDate(p.createdAt);
+    if (!lastDate) return false;
+    return (now - lastDate.getTime()) / 86400000 >= STALL_DAYS;
+  });
+  if (stalledProjects.length) {
+    const names = stalledProjects.slice(0, 3).map((p) => p.title).join(", ");
+    items.push({ icon: "⏸️", text: `<strong>${stalledProjects.length} projeto(s)</strong> parado(s) há um tempo: ${escapeHtml(names)}${stalledProjects.length > 3 ? "…" : ""}.` });
+  }
+
+  // Próximo aniversário
+  const nextBday = upcomingBirthdays(1)[0];
+  if (nextBday) {
+    items.push(nextBday.isToday
+      ? { icon: "🎉", text: `Hoje é aniversário de <strong>${escapeHtml(nextBday.name)}</strong>!` }
+      : { icon: "🎂", text: `Faltam <strong>${nextBday.daysLeft} dia(s)</strong> para o aniversário de ${escapeHtml(nextBday.name)}.` });
+  }
+
+  // Próximo prazo (projeto ou evento)
+  const projectDeadlines = projectItems.filter((p) => p.deadline && p.status !== "Concluido").map((p) => ({ title: p.title, date: p.deadline, kind: "projeto" }));
+  const eventDeadlines = upcomingEvents().map((e) => ({ title: e.title, date: e.date, kind: "evento" }));
+  const nextDeadline = [...projectDeadlines, ...eventDeadlines].sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (nextDeadline) {
+    const days = Math.round((new Date(nextDeadline.date + "T00:00:00") - new Date(todayStr + "T00:00:00")) / 86400000);
+    const when = days === 0 ? "hoje" : days === 1 ? "amanhã" : `em ${days} dia(s)`;
+    items.push({ icon: "⏰", text: `Próximo prazo: <strong>${escapeHtml(nextDeadline.title)}</strong> (${nextDeadline.kind}) ${when}.` });
+  }
+
+  // Última anotação do diário
+  const lastDiary = [...diaryItems].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))[0];
+  if (lastDiary) {
+    const ts = tsToDate(lastDiary.updatedAt) || tsToDate(lastDiary.createdAt);
+    items.push({ icon: "📓", text: `Sua última anotação no diário foi <strong>${relativeTime(ts)}</strong>: "${escapeHtml(lastDiary.title)}".` });
+  }
+
+  // Última observação AH/SD
+  const lastAhsd = [...ahsdItems].sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime))[0];
+  if (lastAhsd) {
+    items.push({ icon: "🧠", text: `Última observação AH/SD registrada <strong>${relativeTime(new Date(lastAhsd.dateTime))}</strong>.` });
+  }
+
+  // Sugestão automática de prioridade
+  let suggestion;
+  if (stalledProjects.length) {
+    suggestion = `Que tal retomar o projeto <strong>"${escapeHtml(stalledProjects[0].title)}"</strong>? Ele está parado há um tempo.`;
+  } else if (totalOpen > 0) {
+    suggestion = "Você tem demandas em aberto — mover uma para \"Em Progresso\" pode ajudar a manter o ritmo.";
+  } else if (nextDeadline) {
+    suggestion = `Fique de olho no prazo de "${escapeHtml(nextDeadline.title)}".`;
+  } else {
+    suggestion = "Tudo em dia por aqui! Bom momento para registrar uma ideia no diário ou planejar o próximo projeto.";
+  }
+  items.push({ icon: "💡", text: suggestion, suggestion: true });
+
+  return items;
+}
+
+function renderDailyBrief() {
+  if (!currentUser) return;
+  const items = buildDailyBrief();
+  $("#daily-brief-list").innerHTML = items.map((i) => `
+    <div class="brief-item ${i.suggestion ? "brief-suggestion" : ""}">
+      <span class="brief-icon">${i.icon}</span>
+      <span class="brief-text">${i.text}</span>
+    </div>
+  `).join("");
+}
+
+/* =========================================================
+   BUSCA GLOBAL (Ctrl+K) — estilo Notion/VSCode
+========================================================= */
+let cmdkResults = [];
+let cmdkActiveIndex = -1;
+
+function searchEverything(term) {
+  const t = term.trim().toLowerCase();
+  if (!t) return [];
+  const results = [];
+
+  diaryItems.forEach((i) => {
+    const hay = [i.title, i.content, i.book, ...(i.tags || [])].join(" ").toLowerCase();
+    if (hay.includes(t)) results.push({ type: "diario", id: i.id, text: i.title });
+  });
+  ahsdItems.forEach((i) => {
+    const hay = [i.content, ...(i.tags || [])].join(" ").toLowerCase();
+    if (hay.includes(t)) results.push({ type: "ahsd", id: i.id, text: i.content.slice(0, 60) });
+  });
+  kanbanItems.forEach((i) => {
+    const hay = [i.title, i.description].join(" ").toLowerCase();
+    if (hay.includes(t)) results.push({ type: "kanban", id: i.id, text: i.title });
+  });
+  projectItems.forEach((i) => {
+    const hay = [i.title, i.description, i.category].join(" ").toLowerCase();
+    if (hay.includes(t)) results.push({ type: "projeto", id: i.id, text: i.title });
+  });
+  eventItems.forEach((i) => {
+    const hay = [i.title, i.notes].join(" ").toLowerCase();
+    if (hay.includes(t)) results.push({ type: "evento", id: i.id, text: `${i.title} · ${fmtDate(new Date(i.date + "T00:00:00"))}` });
+  });
+  birthdayItems.forEach((i) => {
+    if (i.name.toLowerCase().includes(t)) results.push({ type: "niver", id: i.id, text: `${i.name} · ${fmtDayMonth(i.day, i.month)}` });
+  });
+
+  return results.slice(0, 40);
+}
+
+const CMDK_QUICK_ACTIONS = [
+  { label: "+ Diário", view: "diario", btn: "#diario-new-btn" },
+  { label: "+ AH/SD", view: "ahsd", btn: "#ahsd-new-btn" },
+  { label: "+ Demanda", view: "kanban", btn: "#kanban-new-btn" },
+  { label: "+ Projeto", view: "projetos", btn: "#projeto-new-btn" },
+  { label: "+ Evento", view: "agenda", btn: "#evento-new-btn" },
+  { label: "+ Aniversário", view: "agenda", btn: "#niver-new-btn" },
+];
+
+function renderCmdkQuickActions() {
+  $("#cmdk-quick-actions").innerHTML = CMDK_QUICK_ACTIONS.map((a, idx) => `<button type="button" class="cmdk-quick-btn" data-idx="${idx}">${a.label}</button>`).join("");
+  $$(".cmdk-quick-btn", $("#cmdk-quick-actions")).forEach((btn) => btn.addEventListener("click", () => {
+    const action = CMDK_QUICK_ACTIONS[Number(btn.dataset.idx)];
+    closeCmdk();
+    switchView(action.view);
+    setTimeout(() => $(action.btn)?.click(), 50);
+  }));
+}
+
+function paintCmdkResults() {
+  if (!cmdkResults.length) {
+    $("#cmdk-results").innerHTML = `<p class="cmdk-empty">Nenhum resultado. Tente outro termo ou use os atalhos acima para criar algo novo.</p>`;
+    return;
+  }
+  $("#cmdk-results").innerHTML = cmdkResults.map((r, idx) => {
+    const meta = ACTIVITY_META[r.type];
     return `
-      <div class="activity-row">
-        <span class="activity-tag" style="background:${meta.bg}; color:${meta.color};">${meta.label}</span>
-        <span class="activity-text">${escapeHtml(item.title)}</span>
-        <span class="activity-time">${relativeTime(item.ts)}</span>
+      <div class="cmdk-result-row ${idx === cmdkActiveIndex ? "active" : ""}" data-idx="${idx}">
+        <span class="cmdk-result-type" style="background:${meta.bg}; color:${meta.color};">${meta.label}</span>
+        <span class="cmdk-result-text">${escapeHtml(r.text)}</span>
       </div>
     `;
   }).join("");
-
-  renderCalendar();
+  $$(".cmdk-result-row", $("#cmdk-results")).forEach((row) => {
+    row.addEventListener("click", () => selectCmdkResult(Number(row.dataset.idx)));
+    row.addEventListener("mouseenter", () => { cmdkActiveIndex = Number(row.dataset.idx); paintCmdkResults(); });
+  });
 }
+
+function renderCmdkResults(term) {
+  cmdkResults = searchEverything(term);
+  cmdkActiveIndex = cmdkResults.length ? 0 : -1;
+  paintCmdkResults();
+}
+
+function selectCmdkResult(idx) {
+  const r = cmdkResults[idx];
+  if (!r) return;
+  closeCmdk();
+  openActivityItem(r.type, r.id);
+}
+
+function openCmdk() {
+  if (!currentUser) return;
+  $("#cmdk-overlay").classList.remove("hidden");
+  renderCmdkQuickActions();
+  $("#cmdk-input").value = "";
+  $("#cmdk-results").innerHTML = "";
+  cmdkResults = [];
+  cmdkActiveIndex = -1;
+  setTimeout(() => $("#cmdk-input").focus(), 30);
+}
+function closeCmdk() {
+  $("#cmdk-overlay").classList.add("hidden");
+}
+
+$("#global-search-btn").addEventListener("click", openCmdk);
+$("#cmdk-overlay").addEventListener("click", (e) => { if (e.target.id === "cmdk-overlay") closeCmdk(); });
+$("#cmdk-input").addEventListener("input", (e) => renderCmdkResults(e.target.value));
+$("#cmdk-input").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (cmdkResults.length) { cmdkActiveIndex = (cmdkActiveIndex + 1) % cmdkResults.length; paintCmdkResults(); }
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (cmdkResults.length) { cmdkActiveIndex = (cmdkActiveIndex - 1 + cmdkResults.length) % cmdkResults.length; paintCmdkResults(); }
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (cmdkActiveIndex >= 0) selectCmdkResult(cmdkActiveIndex);
+  } else if (e.key === "Escape") {
+    closeCmdk();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+    e.preventDefault();
+    if (!currentUser) return;
+    $("#cmdk-overlay").classList.contains("hidden") ? openCmdk() : closeCmdk();
+  } else if (e.key === "Escape" && !$("#cmdk-overlay").classList.contains("hidden")) {
+    closeCmdk();
+  }
+});
 
 /* =========================================================
    CALENDÁRIO INTERATIVO — Dashboard
