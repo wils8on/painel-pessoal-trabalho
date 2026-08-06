@@ -391,11 +391,11 @@ html[data-theme="light"] .icon-moon { display: block; }
 .progress-overview { display: flex; gap: 1.4rem; align-items: flex-start; flex-wrap: wrap; }
 .dash-card-ring-inline { display: flex; flex-direction: column; align-items: center; text-align: center; flex-shrink: 0; width: 128px; }
 .dash-projects-breakdown { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 0.55rem; }
-.dash-project-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; }
-.dash-project-row .proj-name { width: 40%; min-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dash-project-row .proj-track { flex: 1; height: 6px; border-radius: 4px; background: var(--surface-strong); overflow: hidden; }
-.dash-project-row .proj-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--teal), #7BF0D3); }
-.dash-project-row .proj-pct { font-family: var(--font-mono); color: var(--ink-muted); width: 34px; text-align: right; flex-shrink: 0; }
+.mini-progress-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; }
+.mini-progress-row .mp-name { width: 40%; min-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-progress-row .mp-track { flex: 1; height: 6px; border-radius: 4px; background: var(--surface-strong); overflow: hidden; }
+.mini-progress-row .mp-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--teal), #7BF0D3); }
+.mini-progress-row .mp-pct { font-family: var(--font-mono); color: var(--ink-muted); width: 34px; text-align: right; flex-shrink: 0; }
 
 /* ---------------- Calendário (Dashboard) ---------------- */
 .dash-card-calendar { min-height: auto; }
@@ -958,3 +958,124 @@ kbd, .cmdk-esc {
   .cmdk-overlay { padding-top: 4vh; }
   .tag-freq-name { width: 96px; }
 }
+
+/* =========================================================
+   FASE 2 — Metas & Hábitos
+   ========================================================= */
+
+/* ---------------- Metas ---------------- */
+.tag-toggle-group-label { font-size: 0.74rem; color: var(--ink-faint); margin: 0.6rem 0 0.3rem; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.03em; }
+.linked-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
+.linked-chip {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 20px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.linked-chip:hover { color: var(--ink); border-color: var(--teal); }
+.goal-sparkline { display: block; margin: 0.4rem 0; }
+
+/* ---------------- Hábitos ---------------- */
+.habit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.9rem; }
+.habit-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.1rem;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.habit-card-head { display: flex; align-items: center; gap: 0.6rem; }
+.habit-emoji { font-size: 1.4rem; line-height: 1; }
+.habit-title-wrap { flex: 1; min-width: 0; }
+.habit-title { font-family: var(--font-display); font-weight: 600; font-size: 1rem; margin: 0; }
+.habit-freq-badge {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--ink-muted);
+  background: var(--surface-strong);
+  padding: 0.12rem 0.45rem;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 0.2rem;
+}
+.habit-streak-badge {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--rust);
+  background: var(--rust-soft);
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.habit-today-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-strong);
+  color: var(--ink-muted);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  align-self: flex-start;
+}
+.habit-today-btn.done { background: linear-gradient(135deg, var(--rust), #FFB199); border-color: var(--rust); color: #3A1206; }
+
+.habit-heatmap {
+  display: grid;
+  grid-template-rows: repeat(7, 11px);
+  grid-auto-flow: column;
+  grid-auto-columns: 11px;
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.habit-cell {
+  width: 11px; height: 11px;
+  border-radius: 3px;
+  background: var(--surface-strong);
+  cursor: pointer;
+}
+.habit-cell.empty { background: transparent; cursor: default; }
+.habit-cell.done { background: var(--rust); }
+.habit-cell.today { box-shadow: 0 0 0 1.5px var(--primary-2); }
+.habit-cell.future { cursor: default; opacity: 0.35; }
+
+.habit-stats { font-size: 0.76rem; color: var(--ink-muted); display: flex; gap: 0.9rem; flex-wrap: wrap; }
+.habit-stats strong { color: var(--ink); }
+.habit-card-actions { display: flex; gap: 0.6rem; margin-top: auto; }
+.habit-card-actions button { border: none; background: none; color: var(--ink-muted); font-size: 0.76rem; text-decoration: underline; padding: 0; }
+
+/* =========================================================
+   Widgets do Dashboard — Metas em destaque & Hábitos de hoje
+   ========================================================= */
+.dash-goals-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.dash-habits-today { display: flex; flex-direction: column; }
+.habit-today-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  font-size: 0.84rem;
+}
+.habit-today-row:last-child { margin-bottom: 0; }
+.habit-today-check {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+}
+.habit-today-row.done .habit-today-check { background: var(--rust); border-color: var(--rust); }
+.habit-today-row.done .habit-today-check::after { content: "✓"; font-size: 0.7rem; color: #3A1206; }
+.habit-today-name { flex: 1; }
+.habit-today-streak { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); }

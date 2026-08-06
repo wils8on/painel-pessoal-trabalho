@@ -217,6 +217,8 @@ const kanbanApi = makeCollectionApi("kanbanTasks");
 const projectsApi = makeCollectionApi("projects");
 const eventsApi = makeCollectionApi("agendaEvents");
 const birthdaysApi = makeCollectionApi("birthdays");
+const goalsApi = makeCollectionApi("goals");
+const habitsApi = makeCollectionApi("habits");
 
 function startAllModules(uid) {
   diaryApi.subscribe(uid, renderDiary);
@@ -225,6 +227,8 @@ function startAllModules(uid) {
   projectsApi.subscribe(uid, renderProjects);
   eventsApi.subscribe(uid, renderEvents);
   birthdaysApi.subscribe(uid, renderBirthdays);
+  goalsApi.subscribe(uid, renderGoals);
+  habitsApi.subscribe(uid, renderHabits);
 }
 
 /* =========================================================
@@ -805,6 +809,442 @@ function renderProjects(items) {
 }
 
 /* =========================================================
+   MÓDULO 4.1 — Metas
+========================================================= */
+let goalItems = [];
+const metaForm = $("#meta-form-wrap");
+let metaLinkProjects = [];
+let metaLinkTasks = [];
+let metaLinkHabits = [];
+
+const GOAL_STATUS_LABEL = { "Nao iniciada": "Não iniciada", "Em andamento": "Em andamento", "Pausada": "Pausada", "Concluida": "Concluída" };
+
+function renderMetaProjectToggles() {
+  $("#meta-link-projects").innerHTML = projectItems.length
+    ? projectItems.map((p) => `<button type="button" class="tag-toggle ${metaLinkProjects.includes(p.id) ? "active" : ""}" data-id="${p.id}">${escapeHtml(p.title)}</button>`).join("")
+    : `<p class="empty-state small">Nenhum projeto cadastrado ainda.</p>`;
+  $$(".tag-toggle", $("#meta-link-projects")).forEach((btn) => btn.addEventListener("click", () => {
+    const id = btn.dataset.id;
+    metaLinkProjects = metaLinkProjects.includes(id) ? metaLinkProjects.filter((x) => x !== id) : [...metaLinkProjects, id];
+    renderMetaProjectToggles();
+  }));
+}
+function renderMetaTaskToggles() {
+  $("#meta-link-tasks").innerHTML = kanbanItems.length
+    ? kanbanItems.map((t) => `<button type="button" class="tag-toggle ${metaLinkTasks.includes(t.id) ? "active" : ""}" data-id="${t.id}">${escapeHtml(t.title)}</button>`).join("")
+    : `<p class="empty-state small">Nenhuma demanda cadastrada ainda.</p>`;
+  $$(".tag-toggle", $("#meta-link-tasks")).forEach((btn) => btn.addEventListener("click", () => {
+    const id = btn.dataset.id;
+    metaLinkTasks = metaLinkTasks.includes(id) ? metaLinkTasks.filter((x) => x !== id) : [...metaLinkTasks, id];
+    renderMetaTaskToggles();
+  }));
+}
+function renderMetaHabitToggles() {
+  $("#meta-link-habits").innerHTML = habitItems.length
+    ? habitItems.map((h) => `<button type="button" class="tag-toggle ${metaLinkHabits.includes(h.id) ? "active" : ""}" data-id="${h.id}">${escapeHtml(h.emoji || "🔁")} ${escapeHtml(h.title)}</button>`).join("")
+    : `<p class="empty-state small">Nenhum hábito cadastrado ainda.</p>`;
+  $$(".tag-toggle", $("#meta-link-habits")).forEach((btn) => btn.addEventListener("click", () => {
+    const id = btn.dataset.id;
+    metaLinkHabits = metaLinkHabits.includes(id) ? metaLinkHabits.filter((x) => x !== id) : [...metaLinkHabits, id];
+    renderMetaHabitToggles();
+  }));
+}
+
+function buildSparkline(log) {
+  if (!log || log.length < 2) return "";
+  const w = 220, h = 34, pad = 3;
+  const points = log.map((entry, idx) => {
+    const x = pad + (idx / (log.length - 1)) * (w - pad * 2);
+    const y = h - pad - (Math.max(0, Math.min(100, entry.percent)) / 100) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `<svg class="goal-sparkline" width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${points}" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+$("#meta-new-btn").addEventListener("click", () => {
+  $("#meta-edit-id").value = "";
+  $("#meta-title").value = "";
+  $("#meta-category").value = "Pessoal";
+  $("#meta-priority").value = "Media";
+  $("#meta-status").value = "Nao iniciada";
+  $("#meta-deadline").value = "";
+  $("#meta-desc").value = "";
+  $("#meta-progress").value = 0;
+  $("#meta-progress-value").textContent = 0;
+  metaLinkProjects = []; metaLinkTasks = []; metaLinkHabits = [];
+  renderMetaProjectToggles(); renderMetaTaskToggles(); renderMetaHabitToggles();
+  metaForm.classList.remove("hidden");
+});
+$("#meta-cancel-btn").addEventListener("click", () => metaForm.classList.add("hidden"));
+$("#meta-progress").addEventListener("input", (e) => { $("#meta-progress-value").textContent = e.target.value; });
+$("#meta-filter-status").addEventListener("change", () => renderGoals());
+$("#meta-search").addEventListener("input", () => renderGoals());
+
+$("#meta-save-btn").addEventListener("click", async () => {
+  const title = $("#meta-title").value.trim();
+  if (!title) return showToast("Informe o título da meta.", "error");
+  const newProgress = Number($("#meta-progress").value);
+  const editId = $("#meta-edit-id").value;
+  const existing = editId ? goalItems.find((i) => i.id === editId) : null;
+  const existingLog = existing?.progressLog || [];
+  const payload = {
+    title,
+    category: $("#meta-category").value,
+    priority: $("#meta-priority").value,
+    status: $("#meta-status").value,
+    deadline: $("#meta-deadline").value || null,
+    description: $("#meta-desc").value.trim(),
+    progress: newProgress,
+    linkedProjectIds: metaLinkProjects,
+    linkedTaskIds: metaLinkTasks,
+    linkedHabitIds: metaLinkHabits,
+  };
+  if (!existing || existing.progress !== newProgress) {
+    payload.progressLog = [...existingLog, { date: new Date().toISOString(), percent: newProgress, note: existing ? "Atualizado pelo formulário" : "Criação da meta" }];
+  }
+  try {
+    if (editId) await goalsApi.update(editId, payload);
+    else await goalsApi.add(currentUser.uid, payload);
+    metaForm.classList.add("hidden");
+    showToast(editId ? "Meta atualizada." : "Meta criada.");
+  } catch (err) {
+    console.error(err);
+    showToast("Não foi possível salvar. Tente novamente.", "error");
+  }
+});
+
+async function quickUpdateGoalProgress(id, percent, note) {
+  const item = goalItems.find((i) => i.id === id);
+  if (!item) return;
+  const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
+  const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: clamped, note: note?.trim() || "" }];
+  try {
+    await goalsApi.update(id, { progress: clamped, progressLog: log });
+    showToast("Progresso atualizado.");
+  } catch (err) {
+    console.error(err);
+    showToast("Não foi possível registrar a atualização.", "error");
+  }
+}
+
+function openGoalEntry(id) {
+  const item = goalItems.find((i) => i.id === id);
+  if (!item) return;
+  switchView("metas");
+  $("#meta-edit-id").value = item.id;
+  $("#meta-title").value = item.title;
+  $("#meta-category").value = item.category || "Pessoal";
+  $("#meta-priority").value = item.priority || "Media";
+  $("#meta-status").value = item.status || "Nao iniciada";
+  $("#meta-deadline").value = item.deadline || "";
+  $("#meta-desc").value = item.description || "";
+  $("#meta-progress").value = item.progress || 0;
+  $("#meta-progress-value").textContent = item.progress || 0;
+  metaLinkProjects = [...(item.linkedProjectIds || [])];
+  metaLinkTasks = [...(item.linkedTaskIds || [])];
+  metaLinkHabits = [...(item.linkedHabitIds || [])];
+  renderMetaProjectToggles(); renderMetaTaskToggles(); renderMetaHabitToggles();
+  metaForm.classList.remove("hidden");
+}
+
+function renderGoals(items) {
+  if (items) goalItems = items;
+  const search = $("#meta-search").value.toLowerCase();
+  const statusFilter = $("#meta-filter-status").value;
+  const sorted = [...goalItems]
+    .filter((i) => !statusFilter || i.status === statusFilter)
+    .filter((i) => !search || i.title.toLowerCase().includes(search) || (i.description || "").toLowerCase().includes(search))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+  $("#meta-empty").classList.toggle("hidden", sorted.length > 0);
+  $("#meta-list").innerHTML = sorted.map((item) => {
+    const priorityClass = PRIORITY_BADGE[item.priority] || "badge-media";
+    const linkedProjects = (item.linkedProjectIds || []).map((id) => projectItems.find((p) => p.id === id)).filter(Boolean);
+    const linkedTasks = (item.linkedTaskIds || []).map((id) => kanbanItems.find((p) => p.id === id)).filter(Boolean);
+    const linkedHabits = (item.linkedHabitIds || []).map((id) => habitItems.find((p) => p.id === id)).filter(Boolean);
+    const linksHtml = [
+      ...linkedProjects.map((p) => `<span class="linked-chip" data-type="projeto" data-id="${p.id}">📁 ${escapeHtml(p.title)}</span>`),
+      ...linkedTasks.map((t) => `<span class="linked-chip" data-type="kanban" data-id="${t.id}">🗂️ ${escapeHtml(t.title)}</span>`),
+      ...linkedHabits.map((h) => `<span class="linked-chip" data-type="habito" data-id="${h.id}">${escapeHtml(h.emoji || "🔁")} ${escapeHtml(h.title)}</span>`),
+    ].join("");
+    const log = item.progressLog || [];
+    const logEntriesHtml = [...log].reverse().map((entry) => `
+      <div class="progress-log-entry">
+        <span class="log-date">${fmtDateTime(new Date(entry.date))}</span>
+        <span class="log-pct">${entry.percent}%</span>
+        ${entry.note ? `<span class="log-note">${escapeHtml(entry.note)}</span>` : ""}
+      </div>
+    `).join("");
+
+    return `
+    <article class="entry-card">
+      <div class="entry-card-top">
+        <span class="entry-tag" style="background:var(--teal-soft); color:var(--teal);">${escapeHtml(item.category || "Outro")}</span>
+        <span class="badge ${priorityClass}">${PRIORITY_LABEL[item.priority] || item.priority}</span>
+        <span class="badge badge-status">${GOAL_STATUS_LABEL[item.status] || item.status}</span>
+      </div>
+      <h3 class="entry-title">${escapeHtml(item.title)}</h3>
+      ${item.description ? `<p class="entry-body">${escapeHtml(item.description)}</p>` : ""}
+      ${item.deadline ? `<div class="entry-meta"><span>Prazo: ${fmtDate(new Date(item.deadline + "T00:00:00"))}</span></div>` : ""}
+      <div class="progress-bar"><div class="progress-fill" style="width:${item.progress || 0}%"></div></div>
+      <span class="progress-value">${item.progress || 0}% concluído</span>
+      ${buildSparkline(log)}
+      ${linksHtml ? `<div class="linked-chips">${linksHtml}</div>` : ""}
+
+      <div class="progress-log">
+        <button type="button" class="progress-log-toggle" data-action="toggle-log" data-id="${item.id}">
+          Histórico ${log.length ? `(${log.length})` : ""} ▾
+        </button>
+        <div class="progress-log-panel hidden" id="goal-log-panel-${item.id}">
+          ${logEntriesHtml ? `<div class="progress-log-entries">${logEntriesHtml}</div>` : `<p class="empty-state small">Nenhuma atualização registrada ainda.</p>`}
+          <div class="progress-log-form">
+            <div class="form-row form-row-2">
+              <label class="field-label">Novo progresso (%)
+                <input type="number" min="0" max="100" class="input mono" id="goal-quick-progress-${item.id}" value="${item.progress || 0}" />
+              </label>
+              <label class="field-label">Observação (opcional)
+                <input type="text" class="input" id="goal-quick-note-${item.id}" placeholder="O que mudou?" />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary btn-sm" data-accent="teal" data-action="quick-update" data-id="${item.id}">Registrar atualização</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="entry-actions">
+        <button data-action="edit" data-id="${item.id}">Editar</button>
+        <button data-action="delete" data-id="${item.id}">Excluir</button>
+      </div>
+    </article>
+  `;
+  }).join("");
+
+  $$('#meta-list [data-action="toggle-log"]').forEach((btn) => btn.addEventListener("click", () => {
+    $(`#goal-log-panel-${btn.dataset.id}`).classList.toggle("hidden");
+  }));
+  $$('#meta-list [data-action="quick-update"]').forEach((btn) => btn.addEventListener("click", async () => {
+    const id = btn.dataset.id;
+    const percent = $(`#goal-quick-progress-${id}`).value;
+    const note = $(`#goal-quick-note-${id}`).value;
+    await quickUpdateGoalProgress(id, percent, note);
+  }));
+  $$('#meta-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openGoalEntry(btn.dataset.id)));
+  $$('#meta-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
+    if (confirm("Excluir esta meta?")) { goalsApi.remove(btn.dataset.id); showToast("Meta excluída."); }
+  }));
+  $$("#meta-list .linked-chip").forEach((chip) => chip.addEventListener("click", () => openActivityItem(chip.dataset.type, chip.dataset.id)));
+
+  refreshDashboard();
+}
+
+/* =========================================================
+   MÓDULO 4.2 — Hábitos
+========================================================= */
+let habitItems = [];
+const habitoForm = $("#habito-form-wrap");
+const HABIT_FREQ_LABEL = { diario: "Diário", semanal: "Semanal", mensal: "Mensal" };
+
+function updateHabitTargetVisibility() {
+  const freq = $("#habito-frequency").value;
+  const wrap = $("#habito-target-wrap");
+  if (freq === "diario") {
+    wrap.classList.add("hidden");
+  } else {
+    wrap.classList.remove("hidden");
+    $("#habito-target-label").textContent = freq === "semanal" ? "Quantas vezes por semana" : "Quantas vezes por mês";
+  }
+}
+$("#habito-frequency").addEventListener("change", updateHabitTargetVisibility);
+
+$("#habito-new-btn").addEventListener("click", () => {
+  $("#habito-edit-id").value = "";
+  $("#habito-title").value = "";
+  $("#habito-emoji").value = "";
+  $("#habito-frequency").value = "diario";
+  $("#habito-target").value = 3;
+  $("#habito-notes").value = "";
+  updateHabitTargetVisibility();
+  habitoForm.classList.remove("hidden");
+});
+$("#habito-cancel-btn").addEventListener("click", () => habitoForm.classList.add("hidden"));
+
+$("#habito-save-btn").addEventListener("click", async () => {
+  const title = $("#habito-title").value.trim();
+  if (!title) return showToast("Informe o nome do hábito.", "error");
+  const frequency = $("#habito-frequency").value;
+  const payload = {
+    title,
+    emoji: $("#habito-emoji").value.trim() || "🔁",
+    frequency,
+    target: frequency === "diario" ? 1 : (Number($("#habito-target").value) || 1),
+    notes: $("#habito-notes").value.trim(),
+  };
+  const editId = $("#habito-edit-id").value;
+  try {
+    if (editId) await habitsApi.update(editId, payload);
+    else await habitsApi.add(currentUser.uid, { ...payload, completions: [] });
+    habitoForm.classList.add("hidden");
+    showToast(editId ? "Hábito atualizado." : "Hábito criado.");
+  } catch (err) {
+    console.error(err);
+    showToast("Não foi possível salvar. Tente novamente.", "error");
+  }
+});
+
+function openHabitEntry(id) {
+  const item = habitItems.find((i) => i.id === id);
+  if (!item) return;
+  switchView("habitos");
+  $("#habito-edit-id").value = item.id;
+  $("#habito-title").value = item.title;
+  $("#habito-emoji").value = item.emoji || "";
+  $("#habito-frequency").value = item.frequency || "diario";
+  $("#habito-target").value = item.target || 3;
+  $("#habito-notes").value = item.notes || "";
+  updateHabitTargetVisibility();
+  habitoForm.classList.remove("hidden");
+}
+
+async function toggleHabitCompletion(id, dateStr) {
+  const item = habitItems.find((i) => i.id === id);
+  if (!item) return;
+  const completions = item.completions || [];
+  const next = completions.includes(dateStr) ? completions.filter((d) => d !== dateStr) : [...completions, dateStr];
+  try {
+    await habitsApi.update(id, { completions: next });
+  } catch (err) {
+    console.error(err);
+    showToast("Não foi possível registrar. Tente novamente.", "error");
+  }
+}
+
+function getWeekKey(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() - d.getDay());
+  return ymd(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function getMonthKey(date) { return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`; }
+function stepBackPeriod(date, frequency) {
+  const d = new Date(date);
+  if (frequency === "semanal") d.setDate(d.getDate() - 7);
+  else d.setMonth(d.getMonth() - 1);
+  return d;
+}
+
+function getHabitStreak(habit) {
+  const completions = habit.completions || [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (habit.frequency === "diario") {
+    let streak = 0;
+    const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
+    let cursor = new Date(today);
+    if (!completions.includes(todayStr)) cursor.setDate(cursor.getDate() - 1);
+    while (completions.includes(ymd(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()))) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+  }
+
+  const keyFn = habit.frequency === "semanal" ? getWeekKey : getMonthKey;
+  const target = habit.target || 1;
+  const counts = {};
+  completions.forEach((dStr) => {
+    const key = keyFn(new Date(dStr + "T00:00:00"));
+    counts[key] = (counts[key] || 0) + 1;
+  });
+
+  let streak = 0;
+  let cursor = new Date(today);
+  if ((counts[keyFn(cursor)] || 0) < target) cursor = stepBackPeriod(cursor, habit.frequency);
+  for (let i = 0; i < 120; i++) {
+    const key = keyFn(cursor);
+    if ((counts[key] || 0) >= target) {
+      streak++;
+      cursor = stepBackPeriod(cursor, habit.frequency);
+    } else break;
+  }
+  return streak;
+}
+
+function buildHabitHeatmap(habit, days = 70) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - (days - 1));
+  const padStart = startDate.getDay();
+  const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
+
+  let cellsHtml = "";
+  for (let p = 0; p < padStart; p++) cellsHtml += `<span class="habit-cell empty"></span>`;
+  for (let i = 0; i < days; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const dateStr = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+    const done = (habit.completions || []).includes(dateStr);
+    const isToday = dateStr === todayStr;
+    const isFuture = d > today;
+    cellsHtml += `<span class="habit-cell ${done ? "done" : ""} ${isToday ? "today" : ""} ${isFuture ? "future" : ""}" data-date="${dateStr}" data-id="${habit.id}" title="${dateStr}${done ? " ✓" : ""}"></span>`;
+  }
+  return cellsHtml;
+}
+
+function renderHabits(items) {
+  if (items) habitItems = items;
+  const sorted = [...habitItems].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  $("#habito-empty").classList.toggle("hidden", sorted.length > 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
+
+  $("#habito-list").innerHTML = sorted.map((item) => {
+    const streak = getHabitStreak(item);
+    const doneToday = (item.completions || []).includes(todayStr);
+    const streakUnit = item.frequency === "diario" ? "dia(s)" : item.frequency === "semanal" ? "semana(s)" : "mês(es)";
+    return `
+    <article class="habit-card">
+      <div class="habit-card-head">
+        <span class="habit-emoji">${escapeHtml(item.emoji || "🔁")}</span>
+        <div class="habit-title-wrap">
+          <p class="habit-title">${escapeHtml(item.title)}</p>
+          <span class="habit-freq-badge">${HABIT_FREQ_LABEL[item.frequency] || item.frequency}${item.frequency !== "diario" ? ` · meta ${item.target}x` : ""}</span>
+        </div>
+        <span class="habit-streak-badge">🔥 ${streak} ${streakUnit}</span>
+      </div>
+
+      <button type="button" class="habit-today-btn ${doneToday ? "done" : ""}" data-action="toggle-today" data-id="${item.id}">
+        ${doneToday ? "✓ Feito hoje" : "Marcar hoje"}
+      </button>
+
+      <div class="habit-heatmap">${buildHabitHeatmap(item)}</div>
+
+      <div class="habit-stats"><span>Total: <strong>${(item.completions || []).length}</strong> marcação(ões)</span></div>
+      ${item.notes ? `<p class="entry-body">${escapeHtml(item.notes)}</p>` : ""}
+
+      <div class="habit-card-actions">
+        <button data-action="edit" data-id="${item.id}">Editar</button>
+        <button data-action="delete" data-id="${item.id}">Excluir</button>
+      </div>
+    </article>
+  `;
+  }).join("");
+
+  $$('#habito-list [data-action="toggle-today"]').forEach((btn) => btn.addEventListener("click", () => toggleHabitCompletion(btn.dataset.id, todayStr)));
+  $$(".habit-cell:not(.empty):not(.future)", $("#habito-list")).forEach((cell) => cell.addEventListener("click", () => toggleHabitCompletion(cell.dataset.id, cell.dataset.date)));
+  $$('#habito-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openHabitEntry(btn.dataset.id)));
+  $$('#habito-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
+    if (confirm("Excluir este hábito?")) { habitsApi.remove(btn.dataset.id); showToast("Hábito excluído."); }
+  }));
+
+  refreshDashboard();
+}
+
+/* =========================================================
    MÓDULO 5 — Agenda & Aniversários
 ========================================================= */
 let eventItems = [];
@@ -1007,6 +1447,8 @@ const ACTIVITY_META = {
   projeto: { label: "Projeto", bg: "var(--teal-soft)", color: "var(--teal)" },
   evento: { label: "Agenda", bg: "var(--rust-soft)", color: "var(--rust)" },
   niver: { label: "Aniversário", bg: "var(--rust-soft)", color: "var(--rust)" },
+  meta: { label: "Meta", bg: "var(--teal-soft)", color: "var(--teal)" },
+  habito: { label: "Hábito", bg: "var(--rust-soft)", color: "var(--rust)" },
 };
 
 function refreshDashboard() {
@@ -1058,10 +1500,10 @@ function refreshDashboard() {
   const sortedActive = [...active].sort((a, b) => (a.progress || 0) - (b.progress || 0));
   $("#dash-projects-list").innerHTML = sortedActive.length
     ? sortedActive.map((p) => `
-        <div class="dash-project-row">
-          <span class="proj-name" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</span>
-          <span class="proj-track"><span class="proj-fill" style="width:${p.progress || 0}%"></span></span>
-          <span class="proj-pct">${p.progress || 0}%</span>
+        <div class="mini-progress-row">
+          <span class="mp-name" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</span>
+          <span class="mp-track"><span class="mp-fill" style="width:${p.progress || 0}%"></span></span>
+          <span class="mp-pct">${p.progress || 0}%</span>
         </div>
       `).join("")
     : `<p class="empty-state small">Cadastre um projeto para acompanhar o progresso aqui.</p>`;
@@ -1082,8 +1524,53 @@ function refreshDashboard() {
     `;
   }).join("");
 
-  // ---- Prazos próximos (projetos + eventos) ----
+  // ---- Metas em destaque ----
   const todayStr = new Date().toISOString().slice(0, 10);
+  const highlightGoals = [...goalItems]
+    .filter((g) => g.status !== "Concluida")
+    .sort((a, b) => {
+      if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
+      if (a.deadline) return -1;
+      if (b.deadline) return 1;
+      return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
+    })
+    .slice(0, 4);
+  $("#dash-goals-empty").classList.toggle("hidden", highlightGoals.length > 0);
+  $("#dash-goals-list").innerHTML = highlightGoals.map((g) => `
+    <div class="mini-progress-row" data-id="${g.id}" style="cursor:pointer;">
+      <span class="mp-name" title="${escapeHtml(g.title)}">${escapeHtml(g.title)}</span>
+      <span class="mp-track"><span class="mp-fill" style="width:${g.progress || 0}%"></span></span>
+      <span class="mp-pct">${g.progress || 0}%</span>
+    </div>
+  `).join("");
+  $$("#dash-goals-list .mini-progress-row").forEach((row) => row.addEventListener("click", () => openGoalEntry(row.dataset.id)));
+
+  // ---- Hábitos de hoje ----
+  $("#dash-habits-empty").classList.toggle("hidden", habitItems.length > 0);
+  $("#dash-habits-today").innerHTML = habitItems.map((h) => {
+    const streak = getHabitStreak(h);
+    const streakUnit = h.frequency === "diario" ? "d" : h.frequency === "semanal" ? "sem" : "mês";
+    let doneCurrentPeriod;
+    if (h.frequency === "diario") {
+      doneCurrentPeriod = (h.completions || []).includes(todayStr);
+    } else {
+      const keyFn = h.frequency === "semanal" ? getWeekKey : getMonthKey;
+      const target = h.target || 1;
+      const currentKey = keyFn(new Date());
+      const count = (h.completions || []).filter((d) => keyFn(new Date(d + "T00:00:00")) === currentKey).length;
+      doneCurrentPeriod = count >= target;
+    }
+    return `
+      <div class="habit-today-row ${doneCurrentPeriod ? "done" : ""}" data-id="${h.id}">
+        <span class="habit-today-check"></span>
+        <span class="habit-today-name">${escapeHtml(h.emoji || "🔁")} ${escapeHtml(h.title)}</span>
+        <span class="habit-today-streak">🔥 ${streak}${streakUnit}</span>
+      </div>
+    `;
+  }).join("");
+  $$("#dash-habits-today .habit-today-row").forEach((row) => row.addEventListener("click", () => toggleHabitCompletion(row.dataset.id, todayStr)));
+
+  // ---- Prazos próximos (projetos + eventos) ----
   const projectDeadlines = projectItems
     .filter((i) => i.deadline && i.status !== "Concluido")
     .map((i) => ({ title: i.title, date: i.deadline, overdue: i.deadline < todayStr, kind: "Projeto" }));
@@ -1124,6 +1611,8 @@ function buildActivityFeed({ limit = null, typeFilter = "", search = "" } = {}) 
     ...projectItems.map((i) => ({ type: "projeto", id: i.id, title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
     ...eventItems.map((i) => ({ type: "evento", id: i.id, title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
     ...birthdayItems.map((i) => ({ type: "niver", id: i.id, title: i.name, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...goalItems.map((i) => ({ type: "meta", id: i.id, title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
+    ...habitItems.map((i) => ({ type: "habito", id: i.id, title: i.title, ts: tsToDate(i.updatedAt) || tsToDate(i.createdAt) })),
   ].filter((i) => i.ts);
 
   if (typeFilter) activity = activity.filter((i) => i.type === typeFilter);
@@ -1158,6 +1647,8 @@ function openActivityItem(type, id) {
     case "projeto": openProjectEntry(id); break;
     case "evento": openEventEntry(id); break;
     case "niver": openBirthdayEntry(id); break;
+    case "meta": openGoalEntry(id); break;
+    case "habito": openHabitEntry(id); break;
   }
 }
 
@@ -1299,6 +1790,14 @@ function searchEverything(term) {
   birthdayItems.forEach((i) => {
     if (i.name.toLowerCase().includes(t)) results.push({ type: "niver", id: i.id, text: `${i.name} · ${fmtDayMonth(i.day, i.month)}` });
   });
+  goalItems.forEach((i) => {
+    const hay = [i.title, i.description, i.category].join(" ").toLowerCase();
+    if (hay.includes(t)) results.push({ type: "meta", id: i.id, text: i.title });
+  });
+  habitItems.forEach((i) => {
+    const hay = [i.title, i.notes].join(" ").toLowerCase();
+    if (hay.includes(t)) results.push({ type: "habito", id: i.id, text: `${i.emoji || "🔁"} ${i.title}` });
+  });
 
   return results.slice(0, 40);
 }
@@ -1308,6 +1807,8 @@ const CMDK_QUICK_ACTIONS = [
   { label: "+ AH/SD", view: "ahsd", btn: "#ahsd-new-btn" },
   { label: "+ Demanda", view: "kanban", btn: "#kanban-new-btn" },
   { label: "+ Projeto", view: "projetos", btn: "#projeto-new-btn" },
+  { label: "+ Meta", view: "metas", btn: "#meta-new-btn" },
+  { label: "+ Hábito", view: "habitos", btn: "#habito-new-btn" },
   { label: "+ Evento", view: "agenda", btn: "#evento-new-btn" },
   { label: "+ Aniversário", view: "agenda", btn: "#niver-new-btn" },
 ];

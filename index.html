@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Dossiê — Painel Pessoal</title>
+<title>Nova — Painel Pessoal</title>
 <meta name="description" content="Painel pessoal e de trabalho: dashboard, diário literário, acompanhamento AH/SD, demandas de BI, projetos e agenda." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +22,7 @@
     <div class="login-mark">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>
     </div>
-    <h1 class="login-title">DOSSIÊ</h1>
+    <h1 class="login-title">Nova</h1>
     <p class="login-subtitle">Seu painel pessoal e de trabalho — diário, acompanhamentos, demandas, projetos e agenda, tudo num só lugar.</p>
     <button id="google-signin-btn" class="btn btn-google">
       <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
@@ -69,6 +69,14 @@
     <button class="rail-btn" data-view="projetos" data-accent="teal" title="Projetos &amp; Planos" aria-label="Projetos e Planos">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a1 1 0 0 1 1-1h4.5l1.5 2H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z"/><path d="M8 13.5 11 16l5-6"/></svg>
       <span class="rail-label">Projetos</span>
+    </button>
+    <button class="rail-btn" data-view="metas" data-accent="teal" title="Metas" aria-label="Metas">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
+      <span class="rail-label">Metas</span>
+    </button>
+    <button class="rail-btn" data-view="habitos" data-accent="rust" title="Hábitos" aria-label="Hábitos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c4-1 6.5-4 6.5-7.5 0-2.4-1.2-4-2.4-5.5.3 1.6-.4 2.6-1.1 3.1.3-2.4-.7-5-3-7.1-.2 2-.9 3.3-2.1 4.4C8.1 9.3 7 10.9 7 13c0 1.2.4 2.2 1 3-1-.2-1.8-.7-2.4-1.6C5.2 15.7 5 16.5 5 17.3 5 19.5 7.5 21 12 21Z"/></svg>
+      <span class="rail-label">Hábitos</span>
     </button>
     <button class="rail-btn" data-view="agenda" data-accent="rust" title="Agenda &amp; Aniversários" aria-label="Agenda e Aniversários">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/><circle cx="8.3" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.7" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg>
@@ -160,6 +168,18 @@
         <div class="glass-card dash-card">
           <div class="glass-card-head"><h3>Minhas demandas</h3></div>
           <div id="dash-kanban-summary" class="kanban-mini"></div>
+        </div>
+
+        <div class="glass-card dash-card">
+          <div class="glass-card-head"><h3>Metas em destaque</h3></div>
+          <div id="dash-goals-list" class="dash-goals-list"></div>
+          <p class="empty-state small" id="dash-goals-empty">Nenhuma meta cadastrada.</p>
+        </div>
+
+        <div class="glass-card dash-card dash-card-span2">
+          <div class="glass-card-head"><h3>Hábitos de hoje</h3></div>
+          <div id="dash-habits-today" class="dash-habits-today"></div>
+          <p class="empty-state small" id="dash-habits-empty">Nenhum hábito cadastrado ainda.</p>
         </div>
 
         <div class="glass-card dash-card">
@@ -394,6 +414,123 @@
 
       <div id="projeto-list" class="card-grid"></div>
       <p class="empty-state" id="projeto-empty">Nenhum projeto cadastrado ainda.</p>
+    </section>
+
+    <!-- VIEW 4.1 — Metas -->
+    <section class="view" id="view-metas" data-accent="teal">
+      <header class="view-header">
+        <div class="view-header-title">
+          <span class="view-icon" data-accent="teal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <h2 class="view-title">Metas</h2>
+        </div>
+        <button class="btn btn-primary" data-accent="teal" id="meta-new-btn">+ Nova meta</button>
+      </header>
+
+      <div id="meta-form-wrap" class="form-card hidden">
+        <input type="hidden" id="meta-edit-id" />
+        <div class="form-row">
+          <input type="text" id="meta-title" class="input" placeholder="Título da meta" />
+        </div>
+        <div class="form-row form-row-3">
+          <select id="meta-category" class="input select">
+            <option value="Pessoal">Pessoal</option>
+            <option value="Profissional">Profissional</option>
+            <option value="Saúde">Saúde</option>
+            <option value="Financeiro">Financeiro</option>
+            <option value="Aprendizado">Aprendizado</option>
+            <option value="Outro">Outro</option>
+          </select>
+          <select id="meta-priority" class="input select">
+            <option value="Baixa">Prioridade baixa</option>
+            <option value="Media">Prioridade média</option>
+            <option value="Alta">Prioridade alta</option>
+            <option value="Critica">Prioridade crítica</option>
+          </select>
+          <select id="meta-status" class="input select">
+            <option value="Nao iniciada">Não iniciada</option>
+            <option value="Em andamento">Em andamento</option>
+            <option value="Pausada">Pausada</option>
+            <option value="Concluida">Concluída</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="field-label">Prazo<input type="date" id="meta-deadline" class="input mono" /></label>
+        </div>
+        <textarea id="meta-desc" class="input textarea" rows="3" placeholder="Descrição / o que significa alcançar essa meta"></textarea>
+        <label class="range-label">Progresso: <span id="meta-progress-value">0</span>%</label>
+        <input type="range" id="meta-progress" min="0" max="100" value="0" class="range" />
+
+        <p class="field-hint">Vincular a projetos, demandas e/ou hábitos (opcional):</p>
+        <p class="tag-toggle-group-label">Projetos</p>
+        <div class="tag-toggle-group" id="meta-link-projects"></div>
+        <p class="tag-toggle-group-label">Demandas</p>
+        <div class="tag-toggle-group" id="meta-link-tasks"></div>
+        <p class="tag-toggle-group-label">Hábitos</p>
+        <div class="tag-toggle-group" id="meta-link-habits"></div>
+
+        <div class="form-actions">
+          <button class="btn btn-ghost" id="meta-cancel-btn">Cancelar</button>
+          <button class="btn btn-primary" data-accent="teal" id="meta-save-btn">Salvar</button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="meta-search" class="input" placeholder="Buscar metas…" />
+        <select id="meta-filter-status" class="input select">
+          <option value="">Todos os status</option>
+          <option value="Nao iniciada">Não iniciada</option>
+          <option value="Em andamento">Em andamento</option>
+          <option value="Pausada">Pausada</option>
+          <option value="Concluida">Concluída</option>
+        </select>
+      </div>
+
+      <div id="meta-list" class="card-grid"></div>
+      <p class="empty-state" id="meta-empty">Nenhuma meta cadastrada ainda.</p>
+    </section>
+
+    <!-- VIEW 4.2 — Hábitos -->
+    <section class="view" id="view-habitos" data-accent="rust">
+      <header class="view-header">
+        <div class="view-header-title">
+          <span class="view-icon" data-accent="rust">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c4-1 6.5-4 6.5-7.5 0-2.4-1.2-4-2.4-5.5.3 1.6-.4 2.6-1.1 3.1.3-2.4-.7-5-3-7.1-.2 2-.9 3.3-2.1 4.4C8.1 9.3 7 10.9 7 13c0 1.2.4 2.2 1 3-1-.2-1.8-.7-2.4-1.6C5.2 15.7 5 16.5 5 17.3 5 19.5 7.5 21 12 21Z"/></svg>
+          </span>
+          <h2 class="view-title">Hábitos</h2>
+        </div>
+        <button class="btn btn-primary" data-accent="rust" id="habito-new-btn">+ Novo hábito</button>
+      </header>
+
+      <div id="habito-form-wrap" class="form-card hidden">
+        <input type="hidden" id="habito-edit-id" />
+        <div class="form-row form-row-2">
+          <input type="text" id="habito-title" class="input" placeholder="Nome do hábito (ex: Academia, Leitura, Água)" />
+          <input type="text" id="habito-emoji" class="input" maxlength="2" placeholder="Emoji (opcional, ex: 💪)" />
+        </div>
+        <div class="form-row form-row-2">
+          <label class="field-label">Frequência
+            <select id="habito-frequency" class="input select">
+              <option value="diario">Diário</option>
+              <option value="semanal">Semanal</option>
+              <option value="mensal">Mensal</option>
+            </select>
+          </label>
+          <label class="field-label" id="habito-target-wrap">
+            <span id="habito-target-label">Quantas vezes por semana</span>
+            <input type="number" id="habito-target" class="input mono" min="1" max="31" value="3" />
+          </label>
+        </div>
+        <textarea id="habito-notes" class="input textarea" rows="2" placeholder="Notas (opcional)"></textarea>
+        <div class="form-actions">
+          <button class="btn btn-ghost" id="habito-cancel-btn">Cancelar</button>
+          <button class="btn btn-primary" data-accent="rust" id="habito-save-btn">Salvar</button>
+        </div>
+      </div>
+
+      <div id="habito-list" class="habit-grid"></div>
+      <p class="empty-state" id="habito-empty">Nenhum hábito cadastrado ainda.</p>
     </section>
 
     <!-- VIEW 5 — Agenda & Aniversários -->

@@ -99,16 +99,18 @@ Troque `"seuemail@gmail.com"` pelo e-mail da sua conta Google.
 
 ## Coleções do Firestore usadas pelo app
 
-| Coleção        | Campos principais                                                                                                      | Módulo                     |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `diaryEntries` | title, category, book, status, tags[], attachments[] ({url,name,format,resourceType}), content, userId, createdAt      | Diário & Ideias Literárias |
-| `ahsdNotes`    | dateTime, content, userId, createdAt                                                                                   | Avaliação AH/SD            |
-| `kanbanTasks`  | title, description, status, userId, createdAt                                                                          | Demandas de Trabalho & BI  |
-| `projects`     | title, category, priority, status, start, deadline, description, nextSteps, progress, progressLog[], userId, createdAt | Projetos & Planos          |
-| `agendaEvents` | title, date, notes, userId, createdAt                                                                                  | Agenda (eventos)           |
-| `birthdays`    | name, day, month, userId, createdAt                                                                                    | Agenda (aniversários)      |
+| Coleção        | Campos principais                                                                                                                                           | Módulo                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `diaryEntries` | title, category, book, status, tags[], attachments[] ({url,name,format,resourceType}), content, userId, createdAt                                           | Diário & Ideias Literárias |
+| `ahsdNotes`    | dateTime, content, tags[], userId, createdAt                                                                                                                | Avaliação AH/SD            |
+| `kanbanTasks`  | title, description, status, userId, createdAt                                                                                                               | Demandas de Trabalho & BI  |
+| `projects`     | title, category, priority, status, start, deadline, description, nextSteps, progress, progressLog[], userId, createdAt                                      | Projetos & Planos          |
+| `agendaEvents` | title, date, notes, userId, createdAt                                                                                                                       | Agenda (eventos)           |
+| `birthdays`    | name, day, month, userId, createdAt                                                                                                                         | Agenda (aniversários)      |
+| `goals`        | title, category, priority, status, deadline, description, progress, progressLog[], linkedProjectIds[], linkedTaskIds[], linkedHabitIds[], userId, createdAt | Metas                      |
+| `habits`       | title, emoji, frequency (diario/semanal/mensal), target, completions[] (datas "YYYY-MM-DD"), notes, userId, createdAt                                       | Hábitos                    |
 
-`progressLog` é um array de objetos `{ date, percent, note }` — cada vez que você registra uma atualização de progresso (pelo card do projeto ou editando o formulário), uma entrada é adicionada, formando um histórico de acompanhamento.
+`progressLog` é um array de objetos `{ date, percent, note }` — cada vez que você registra uma atualização de progresso (pelo card ou editando o formulário), uma entrada é adicionada, formando um histórico de acompanhamento. O mesmo padrão vale para Projetos e para Metas.
 
 Todas as coleções são criadas automaticamente pelo Firestore na primeira gravação — não é preciso criá-las manualmente.
 
@@ -119,17 +121,26 @@ Todas as coleções são criadas automaticamente pelo Firestore na primeira grav
 - O editor do Diário aceita uma sintaxe leve de Markdown: `# título`, `**negrito**`, `*itálico*` e listas com `- item`.
 - Todas as consultas ao Firestore filtram apenas por `userId` (sem `orderBy` composto), e a ordenação final é feita no navegador — isso evita a necessidade de criar índices compostos manualmente no console do Firebase.
 
-## Roadmap — "Life OS" (Fase 1 concluída)
+## Roadmap — "Life OS" (Fases 1 e 2 concluídas)
 
-O pedido de evolução para um "Life OS" completo tinha 17 frentes. Implementamos a **Fase 1**, focada em tornar o que já existe mais inteligente e conectado, sem alterar a estrutura principal:
+O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos implementando por fases, para não comprometer a qualidade numa única entrega.
 
-- ✅ **Busca Global (Ctrl+K)** — localiza instantaneamente qualquer item em Diário, AH/SD, Demandas, Projetos, Agenda e Aniversários, com atalhos de criação rápida.
+**Fase 1 — inteligência e conexão entre módulos:**
+
+- ✅ **Busca Global (Ctrl+K)** — localiza instantaneamente qualquer item em Diário, AH/SD, Demandas, Projetos, Metas, Hábitos, Agenda e Aniversários, com atalhos de criação rápida.
 - ✅ **Resumo do Dia** — card no Dashboard com mensagens contextuais (demandas pendentes, projetos parados, próximo aniversário/prazo, últimas anotações) e uma sugestão automática de prioridade.
-- ✅ **Atividade Geral** — nova aba com timeline cronológica completa de tudo que foi criado/editado, com busca, filtro por categoria e clique para abrir o registro original.
+- ✅ **Atividade Geral** — aba com timeline cronológica completa de tudo que foi criado/editado, com busca, filtro por categoria e clique para abrir o registro original.
 - ✅ **Marcadores comportamentais no AH/SD** — 12 tags predefinidas, gráfico de frequência dos padrões mais comuns e busca/filtro por tag.
 - ✅ **Notificações toast** — feedback visual de sucesso/erro substituindo os `alert()` nativos.
 
-**Ainda não implementado** (fica como próximas fases, para não comprometer a qualidade em uma única entrega):
+**Fase 2 — Metas & Hábitos:**
+
+- ✅ **Tela de Metas** — prazo, progresso, prioridade, categoria, status, descrição, histórico de progresso (igual Projetos) e vínculo opcional com Projetos, Demandas e Hábitos existentes (chips clicáveis que abrem o item vinculado). Cada meta mostra um mini-gráfico (sparkline) da evolução do progresso ao longo do tempo.
+- ✅ **Tela de Hábitos** — frequência diária, semanal ou mensal (com meta numérica para semanal/mensal), sequência (streak) calculada automaticamente, mapa de calor dos últimos ~70 dias (estilo GitHub, clicável para marcar/desmarcar qualquer dia) e botão rápido "Marcar hoje".
+- ✅ Metas e Hábitos já integrados à Busca Global e à Atividade Geral.
+- ✅ **Widgets no Dashboard**: "Metas em destaque" (as próximas do prazo, com barra de progresso) e "Hábitos de hoje" (lista clicável para marcar o período atual sem sair do Dashboard).
+
+**Ainda não implementado** (próximas fases):
 
 - Tela de **Insights** com estatísticas e gráficos (produtividade, tempo médio de conclusão, evolução mensal etc.)
 - Campos avançados em **Projetos** (horas gastas, checklist, links úteis, riscos, dependências, "próxima ação")
@@ -137,8 +148,7 @@ O pedido de evolução para um "Life OS" completo tinha 17 frentes. Implementamo
 - Campos de contexto no **Diário** (humor, energia, sono, local, clima) e editor Markdown completo
 - Evolução de **Ideias Literárias** (status, tipo, vínculos com personagens/livros/universos)
 - Evolução de **Aniversários** para cadastro completo de **Pessoas** (foto, contato, redes sociais, histórico)
-- Telas novas de **Metas** e **Hábitos** (streaks, calendário, gráficos)
-- Widgets visuais extras no Dashboard (mapa de calor, gráficos semanais/mensais)
+- Mapa de calor de produtividade e gráficos semanais/mensais mais amplos no Dashboard
 - Melhorias de UX mais amplas (drag-and-drop generalizado, skeleton loading, menus de contexto, atalhos adicionais)
 
 Cada uma dessas frentes pode ser pedida como uma próxima fase separada.
