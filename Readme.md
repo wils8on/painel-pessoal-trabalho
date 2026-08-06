@@ -103,11 +103,11 @@ Troque `"seuemail@gmail.com"` pelo e-mail da sua conta Google.
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
 | `diaryEntries` | title, category, book, status, tags[], attachments[] ({url,name,format,resourceType}), content, userId, createdAt                                           | Diário & Ideias Literárias |
 | `ahsdNotes`    | dateTime, content, tags[], userId, createdAt                                                                                                                | Avaliação AH/SD            |
-| `kanbanTasks`  | title, description, status, userId, createdAt                                                                                                               | Demandas de Trabalho & BI  |
-| `projects`     | title, category, priority, status, start, deadline, description, nextSteps, progress, progressLog[], userId, createdAt                                      | Projetos & Planos          |
+| `kanbanTasks`  | title, description, status, completedAt, userId, createdAt                                                                                                  | Demandas de Trabalho & BI  |
+| `projects`     | title, category, priority, status, start, deadline, description, nextSteps, progress, progressLog[], completedAt, userId, createdAt                         | Projetos & Planos          |
 | `agendaEvents` | title, date, notes, userId, createdAt                                                                                                                       | Agenda (eventos)           |
 | `birthdays`    | name, day, month, userId, createdAt                                                                                                                         | Agenda (aniversários)      |
-| `goals`        | title, category, priority, status, deadline, description, progress, progressLog[], linkedProjectIds[], linkedTaskIds[], linkedHabitIds[], userId, createdAt | Metas                      |
+| `goals`        | title, category, priority, status, deadline, description, progress, progressLog[], completedAt, linkedProjectIds[], linkedTaskIds[], linkedHabitIds[], userId, createdAt | Metas                      |
 | `habits`       | title, emoji, frequency (diario/semanal/mensal), target, completions[] (datas "YYYY-MM-DD"), notes, userId, createdAt                                       | Hábitos                    |
 
 `progressLog` é um array de objetos `{ date, percent, note }` — cada vez que você registra uma atualização de progresso (pelo card ou editando o formulário), uma entrada é adicionada, formando um histórico de acompanhamento. O mesmo padrão vale para Projetos e para Metas.
@@ -121,7 +121,7 @@ Todas as coleções são criadas automaticamente pelo Firestore na primeira grav
 - O editor do Diário aceita uma sintaxe leve de Markdown: `# título`, `**negrito**`, `*itálico*` e listas com `- item`.
 - Todas as consultas ao Firestore filtram apenas por `userId` (sem `orderBy` composto), e a ordenação final é feita no navegador — isso evita a necessidade de criar índices compostos manualmente no console do Firebase.
 
-## Roadmap — "Life OS" (Fases 1 e 2 concluídas)
+## Roadmap — "Life OS" (Fases 1, 2 e 3 concluídas)
 
 O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos implementando por fases, para não comprometer a qualidade numa única entrega.
 
@@ -140,9 +140,15 @@ O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos impl
 - ✅ Metas e Hábitos já integrados à Busca Global e à Atividade Geral.
 - ✅ **Widgets no Dashboard**: "Metas em destaque" (as próximas do prazo, com barra de progresso) e "Hábitos de hoje" (lista clicável para marcar o período atual sem sair do Dashboard).
 
+**Fase 3 — Insights:**
+
+- ✅ **Tela de Insights** com filtros de 30, 90, 180 e 365 dias ou todo o histórico.
+- ✅ Indicadores de itens criados, entregas concluídas, tempo médio de conclusão e consistência dos hábitos.
+- ✅ Evolução mensal de criação e conclusão, distribuição das demandas por status e rankings de hábitos e metas.
+- ✅ Leitura automática do período com taxa de conversão, hábito mais consistente e progresso médio das metas.
+
 **Ainda não implementado** (próximas fases):
 
-- Tela de **Insights** com estatísticas e gráficos (produtividade, tempo médio de conclusão, evolução mensal etc.)
 - Campos avançados em **Projetos** (horas gastas, checklist, links úteis, riscos, dependências, "próxima ação")
 - Evolução de **Demandas** para visual Trello/Linear (esforço, etiquetas, recorrência, comentários)
 - Campos de contexto no **Diário** (humor, energia, sono, local, clima) e editor Markdown completo

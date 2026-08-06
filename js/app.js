@@ -1,5 +1,5 @@
 // =========================================================
-// js/app.js — Nova: Painel Pessoal e de Trabalho
+// js/app.js — DOSSIÊ: Painel Pessoal e de Trabalho
 // Vanilla JS (ES6+) + Firebase v10 (modular SDK)
 // =========================================================
 import { auth, db, googleProvider } from "./firebase-config.js";
@@ -618,7 +618,8 @@ $$(".kanban-dropzone").forEach((zone) => {
     zone.classList.remove("drag-over");
     const id = e.dataTransfer.getData("text/plain");
     const status = zone.closest(".kanban-col").dataset.status;
-    kanbanApi.update(id, { status });
+    const existing = kanbanItems.find((item) => item.id === id);
+    kanbanApi.update(id, { status, completedAt: status === "done" ? (existing?.completedAt || new Date().toISOString()) : null });
   });
 });
 
@@ -669,6 +670,7 @@ $("#projeto-save-btn").addEventListener("click", async () => {
     description: $("#projeto-desc").value.trim(),
     nextSteps: $("#projeto-next").value.trim(),
     progress: newProgress,
+    completedAt: ($("#projeto-status").value === "Concluido" || newProgress >= 100) ? (existing?.completedAt || new Date().toISOString()) : null,
   };
 
   // Só registra uma entrada no histórico se o progresso realmente mudou
@@ -696,7 +698,7 @@ async function quickUpdateProgress(id, percent, note) {
   const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
   const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: clamped, note: note?.trim() || "" }];
   try {
-    await projectsApi.update(id, { progress: clamped, progressLog: log });
+    await projectsApi.update(id, { progress: clamped, progressLog: log, completedAt: clamped >= 100 ? (item.completedAt || new Date().toISOString()) : null });
     showToast("Progresso atualizado.");
   } catch (err) {
     console.error(err);
@@ -898,6 +900,7 @@ $("#meta-save-btn").addEventListener("click", async () => {
     linkedProjectIds: metaLinkProjects,
     linkedTaskIds: metaLinkTasks,
     linkedHabitIds: metaLinkHabits,
+    completedAt: ($("#meta-status").value === "Concluida" || newProgress >= 100) ? (existing?.completedAt || new Date().toISOString()) : null,
   };
   if (!existing || existing.progress !== newProgress) {
     payload.progressLog = [...existingLog, { date: new Date().toISOString(), percent: newProgress, note: existing ? "Atualizado pelo formulário" : "Criação da meta" }];
@@ -919,7 +922,7 @@ async function quickUpdateGoalProgress(id, percent, note) {
   const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
   const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: clamped, note: note?.trim() || "" }];
   try {
-    await goalsApi.update(id, { progress: clamped, progressLog: log });
+    await goalsApi.update(id, { progress: clamped, progressLog: log, completedAt: clamped >= 100 ? (item.completedAt || new Date().toISOString()) : null });
     showToast("Progresso atualizado.");
   } catch (err) {
     console.error(err);
@@ -1597,7 +1600,137 @@ function refreshDashboard() {
   renderCalendar();
   renderDailyBrief();
   renderAtividade();
+  renderInsights();
 }
+
+/* =========================================================
+   INSIGHTS — indicadores derivados dos dados já carregados
+========================================================= */
+function insightDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return tsToDate(value);
+}
+
+function completionDate(item) {
+  const explicit = insightDate(item.completedAt);
+  if (explicit) return explicit;
+  const completedLog = (item.progressLog || [])
+    .filter((entry) => Number(entry.percent) >= 100 && insightDate(entry.date))
+    .sort((a, b) => insightDate(a.date) - insightDate(b.date))[0];
+  return completedLog ? insightDate(completedLog.date) : (insightDate(item.updatedAt) || insightDate(item.createdAt));
+}
+
+function renderInsights() {
+  const root = $("#view-insights");
+  if (!root || !currentUser) return;
+
+  const periodValue = $("#insights-period").value;
+  const now = new Date();
+  const start = periodValue === "all" ? null : new Date(now.getTime() - Number(periodValue) * 86400000);
+  const inPeriod = (date) => {
+    const parsed = insightDate(date);
+    return parsed && (!start || parsed >= start) && parsed <= now;
+  };
+  const createdCollections = [...diaryItems, ...ahsdItems, ...kanbanItems, ...projectItems, ...goalItems];
+  const createdCount = createdCollections.filter((item) => inPeriod(item.createdAt)).length;
+  const completed = [
+    ...kanbanItems.filter((item) => item.status === "done"),
+    ...projectItems.filter((item) => item.status === "Concluido" || Number(item.progress) >= 100),
+    ...goalItems.filter((item) => item.status === "Concluida" || Number(item.progress) >= 100),
+  ];
+  const completedInPeriod = completed.filter((item) => inPeriod(completionDate(item)));
+
+  const completionDurations = completedInPeriod.map((item) => {
+    const created = insightDate(item.createdAt);
+    const done = completionDate(item);
+    return created && done && done >= created ? (done - created) / 86400000 : null;
+  }).filter((value) => value !== null);
+  const avgCompletion = completionDurations.length
+    ? completionDurations.reduce((sum, value) => sum + value, 0) / completionDurations.length
+    : null;
+
+  const habitScores = habitItems.map((habit) => {
+    const habitCreated = insightDate(habit.createdAt);
+    const effectiveStart = start && habitCreated ? new Date(Math.max(start, habitCreated)) : (habitCreated || start || new Date(now.getTime() - 365 * 86400000));
+    const effectiveDays = Math.max(1, Math.ceil((now - effectiveStart) / 86400000) + 1);
+    const actual = (habit.completions || []).filter((date) => inPeriod(date + "T23:59:59") && (!habitCreated || new Date(date + "T23:59:59") >= habitCreated)).length;
+    const target = Math.max(1, Number(habit.target) || 1);
+    const expected = habit.frequency === "diario" ? effectiveDays : habit.frequency === "semanal" ? (effectiveDays / 7) * target : (effectiveDays / 30.44) * target;
+    return { ...habit, actual, score: Math.min(100, Math.round((actual / Math.max(1, expected)) * 100)) };
+  }).sort((a, b) => b.score - a.score);
+  const habitConsistency = habitScores.length ? Math.round(habitScores.reduce((sum, habit) => sum + habit.score, 0) / habitScores.length) : null;
+  const avgGoalProgress = goalItems.length ? Math.round(goalItems.reduce((sum, goal) => sum + (Number(goal.progress) || 0), 0) / goalItems.length) : null;
+
+  const kpis = [
+    { code: "PROD", value: createdCount, label: "itens criados no período", color: "var(--primary-2)", soft: "var(--primary-soft)" },
+    { code: "FEITO", value: completedInPeriod.length, label: "entregas concluídas", color: "var(--teal)", soft: "var(--teal-soft)" },
+    { code: "RITMO", value: avgCompletion === null ? "—" : avgCompletion < 1 ? "<1d" : `${Math.round(avgCompletion)}d`, label: "tempo médio de conclusão", color: "var(--amber)", soft: "var(--amber-soft)" },
+    { code: "HÁBITOS", value: habitConsistency === null ? "—" : `${habitConsistency}%`, label: "consistência média", color: "var(--rust)", soft: "var(--rust-soft)" },
+  ];
+  $("#insights-kpis").innerHTML = kpis.map((kpi) => `
+    <article class="glass-card insight-kpi" style="--kpi-color:${kpi.color};--kpi-soft:${kpi.soft}">
+      <span class="insight-kpi-icon">${kpi.code}</span><strong class="insight-kpi-value">${kpi.value}</strong><span class="insight-kpi-label">${kpi.label}</span>
+    </article>`).join("");
+
+  const monthCount = periodValue === "30" ? 3 : periodValue === "90" ? 4 : periodValue === "180" ? 6 : 12;
+  const months = Array.from({ length: monthCount }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (monthCount - 1 - index), 1);
+    return { date, key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`, created: 0, completed: 0 };
+  });
+  const monthByDate = (date) => {
+    const parsed = insightDate(date);
+    return parsed ? `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}` : "";
+  };
+  createdCollections.forEach((item) => { const month = months.find((entry) => entry.key === monthByDate(item.createdAt)); if (month) month.created += 1; });
+  completed.forEach((item) => { const month = months.find((entry) => entry.key === monthByDate(completionDate(item))); if (month) month.completed += 1; });
+  const maxMonthly = Math.max(1, ...months.flatMap((month) => [month.created, month.completed]));
+  $("#insights-monthly-chart").innerHTML = months.map((month) => `
+    <div class="month-column">
+      <div class="month-bars">
+        <span class="month-bar created" title="${month.created} criado(s)" style="height:${Math.max(2, month.created / maxMonthly * 100)}%"></span>
+        <span class="month-bar completed" title="${month.completed} concluído(s)" style="height:${Math.max(2, month.completed / maxMonthly * 100)}%"></span>
+      </div>
+      <span class="month-label">${new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(month.date).replace(".", "")}</span>
+      <span class="month-total">${month.created} / ${month.completed}</span>
+    </div>`).join("");
+
+  const taskCounts = [
+    { label: "A fazer", count: kanbanItems.filter((item) => (item.status || "todo") === "todo").length, color: "var(--plum)" },
+    { label: "Em progresso", count: kanbanItems.filter((item) => item.status === "doing").length, color: "var(--amber)" },
+    { label: "Concluídas", count: kanbanItems.filter((item) => item.status === "done").length, color: "var(--teal)" },
+  ];
+  const taskTotal = taskCounts.reduce((sum, item) => sum + item.count, 0);
+  let cursor = 0;
+  const donutStops = taskCounts.map((item) => { const startDeg = cursor; cursor += taskTotal ? item.count / taskTotal * 360 : 0; return `${item.color} ${startDeg}deg ${cursor}deg`; }).join(",");
+  $("#insights-task-status").innerHTML = taskTotal ? `
+    <div class="status-donut" style="background:conic-gradient(${donutStops})"><div class="status-donut-center"><div><strong>${taskTotal}</strong><span>demandas</span></div></div></div>
+    <div class="status-legend">${taskCounts.map((item) => `<div class="status-legend-row"><i class="legend-dot" style="background:${item.color}"></i><span>${item.label}</span><strong>${item.count}</strong></div>`).join("")}</div>`
+    : `<div class="insights-empty">Cadastre demandas para visualizar o fluxo.</div>`;
+
+  $("#insights-habits").innerHTML = habitScores.length ? habitScores.slice(0, 6).map((habit) => `
+    <div class="insight-rank-row"><span class="insight-rank-name" title="${escapeHtml(habit.title)}">${escapeHtml(habit.emoji || "↻")} ${escapeHtml(habit.title)}</span><span class="insight-rank-track"><span class="insight-rank-fill" style="width:${habit.score}%"></span></span><span class="insight-rank-value">${habit.score}%</span></div>`).join("")
+    : `<div class="insights-empty">Cadastre hábitos para acompanhar sua consistência.</div>`;
+
+  const rankedGoals = [...goalItems].sort((a, b) => (Number(b.progress) || 0) - (Number(a.progress) || 0)).slice(0, 6);
+  $("#insights-goals").innerHTML = rankedGoals.length ? rankedGoals.map((goal) => `
+    <div class="insight-rank-row"><span class="insight-rank-name" title="${escapeHtml(goal.title)}">${escapeHtml(goal.title)}</span><span class="insight-rank-track"><span class="insight-rank-fill goal" style="width:${Number(goal.progress) || 0}%"></span></span><span class="insight-rank-value">${Number(goal.progress) || 0}%</span></div>`).join("")
+    : `<div class="insights-empty">Cadastre metas para visualizar sua evolução.</div>`;
+
+  const completionRate = createdCount ? Math.round(completedInPeriod.length / createdCount * 100) : 0;
+  const bestHabit = habitScores[0];
+  const activeGoals = goalItems.filter((goal) => goal.status !== "Concluida");
+  $("#insights-summary").innerHTML = `
+    <div class="insight-summary-item"><span class="insight-summary-emoji">✓</span><strong>${completionRate}% de conversão</strong><br>${completedInPeriod.length} conclusão(ões) para ${createdCount} novo(s) item(ns) no período.</div>
+    <div class="insight-summary-item"><span class="insight-summary-emoji">↻</span>${bestHabit ? `<strong>${escapeHtml(bestHabit.title)}</strong><br>É seu hábito mais consistente, com ${bestHabit.score}% de aderência.` : "Cadastre hábitos para descobrir seu ritmo mais consistente."}</div>
+    <div class="insight-summary-item"><span class="insight-summary-emoji">◎</span>${avgGoalProgress === null ? "Cadastre metas para acompanhar sua evolução." : `<strong>${avgGoalProgress}% de progresso médio</strong><br>em ${activeGoals.length} meta(s) ainda ativa(s).`}</div>`;
+}
+
+$("#insights-period").addEventListener("change", renderInsights);
 
 /* =========================================================
    ATIVIDADE GERAL — feed cronológico reutilizável (Dashboard + view própria)

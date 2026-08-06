@@ -336,7 +336,52 @@ html[data-theme="light"] .icon-moon { display: block; }
 .view-icon[data-accent="plum"]  { background: var(--plum-soft); color: var(--plum); }
 .view-icon[data-accent="teal"]  { background: var(--teal-soft); color: var(--teal); }
 .view-icon[data-accent="rust"]  { background: var(--rust-soft); color: var(--rust); }
+.insights-view-icon { background: var(--primary-soft); color: var(--primary-2); }
 .view-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.view-subtitle { margin: 0.18rem 0 0; color: var(--ink-muted); font-size: 0.82rem; }
+
+/* =========================================================
+   INSIGHTS
+   ========================================================= */
+.insights-period-label { display: flex; align-items: center; gap: 0.6rem; color: var(--ink-muted); font-size: 0.76rem; font-family: var(--font-mono); text-transform: uppercase; }
+.insights-period-label .input { width: 190px; margin: 0; text-transform: none; font-family: var(--font-body); }
+.insights-kpis { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 0.8rem; margin-bottom: 1rem; }
+.insight-kpi { padding: 1rem 1.05rem; position: relative; overflow: hidden; }
+.insight-kpi::after { content: ""; position: absolute; width: 72px; height: 72px; border-radius: 50%; right: -24px; top: -26px; background: var(--kpi-soft, var(--primary-soft)); }
+.insight-kpi-icon { color: var(--kpi-color, var(--primary-2)); font-size: 0.78rem; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; }
+.insight-kpi-value { display: block; margin-top: 0.35rem; font-family: var(--font-display); font-weight: 700; font-size: 1.75rem; }
+.insight-kpi-label { color: var(--ink-muted); font-size: 0.74rem; }
+.insights-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.insights-card { padding: 1.1rem; min-height: 260px; }
+.insights-card-wide { grid-column: span 2; }
+.insights-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+.insights-card-head h3 { margin: 0; font-size: 0.95rem; }
+.insights-card-head p { margin: 0.2rem 0 0; color: var(--ink-faint); font-size: 0.72rem; }
+.chart-legend { display: flex; gap: 0.8rem; color: var(--ink-muted); font-size: 0.7rem; }
+.chart-legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.legend-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.legend-dot.created { background: var(--primary-2); }.legend-dot.completed { background: var(--teal); }
+.monthly-chart { height: 220px; display: flex; align-items: stretch; gap: 0.7rem; padding-top: 0.5rem; }
+.month-column { flex: 1; min-width: 38px; display: flex; flex-direction: column; align-items: center; }
+.month-bars { flex: 1; width: 100%; display: flex; justify-content: center; align-items: flex-end; gap: 4px; border-bottom: 1px solid var(--border); }
+.month-bar { width: min(18px, 35%); min-height: 2px; border-radius: 5px 5px 1px 1px; transition: height 0.25s ease; }
+.month-bar.created { background: linear-gradient(180deg, var(--primary-2), var(--primary)); }.month-bar.completed { background: linear-gradient(180deg, #7BF0D3, var(--teal)); }
+.month-label { margin-top: 0.5rem; color: var(--ink-faint); font: 0.66rem var(--font-mono); text-transform: uppercase; }
+.month-total { color: var(--ink-muted); font: 0.62rem var(--font-mono); margin-top: 0.2rem; white-space: nowrap; }
+.status-insight { display: flex; align-items: center; justify-content: center; gap: 1.5rem; min-height: 180px; }
+.status-donut { width: 138px; height: 138px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
+.status-donut-center { width: 86px; height: 86px; border-radius: 50%; background: var(--surface-solid); display: grid; place-items: center; text-align: center; box-shadow: 0 0 0 1px var(--border); }
+.status-donut-center strong { display: block; font: 700 1.4rem var(--font-display); }.status-donut-center span { color: var(--ink-faint); font-size: 0.66rem; }
+.status-legend { display: flex; flex-direction: column; gap: 0.55rem; font-size: 0.76rem; color: var(--ink-muted); }
+.status-legend-row { display: flex; align-items: center; gap: 0.4rem; }.status-legend-row strong { margin-left: auto; color: var(--ink); font-family: var(--font-mono); }
+.insights-ranked-list { display: flex; flex-direction: column; gap: 0.85rem; }
+.insight-rank-row { display: grid; grid-template-columns: minmax(95px, 1fr) minmax(100px, 2fr) 42px; align-items: center; gap: 0.7rem; font-size: 0.78rem; }
+.insight-rank-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.insight-rank-track { height: 7px; background: var(--surface-strong); border-radius: 5px; overflow: hidden; }.insight-rank-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--rust), #FFB199); }.insight-rank-fill.goal { background: linear-gradient(90deg, var(--teal), #7BF0D3); }.insight-rank-value { text-align: right; color: var(--ink-muted); font-family: var(--font-mono); }
+.insights-empty { min-height: 150px; display: grid; place-items: center; text-align: center; color: var(--ink-muted); font-size: 0.8rem; }
+.insights-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; }
+.insight-summary-item { background: var(--surface-strong); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.9rem; color: var(--ink-muted); font-size: 0.8rem; line-height: 1.45; }
+.insight-summary-item strong { color: var(--ink); }.insight-summary-emoji { display: block; font-size: 1.15rem; margin-bottom: 0.35rem; }
+.insights-note { color: var(--ink-faint); font-size: 0.68rem; margin: 0.8rem 0 0; text-align: right; }
 
 /* =========================================================
    DASHBOARD
@@ -741,6 +786,14 @@ html[data-theme="light"] .icon-moon { display: block; }
   .cal-day { height: 34px; font-size: 0.7rem; }
   .dash-hero { flex-direction: column; }
   .form-row-2, .form-row-3 { grid-template-columns: 1fr; }
+  .insights-kpis { grid-template-columns: repeat(2, 1fr); }
+  .insights-grid { grid-template-columns: 1fr; }
+  .insights-card-wide { grid-column: span 1; }
+  .insights-summary { grid-template-columns: 1fr; }
+  .insights-period-label { width: 100%; justify-content: space-between; }
+  .status-insight { flex-direction: column; }
+  .monthly-chart { gap: 0.35rem; overflow-x: auto; }
+  .month-column { min-width: 42px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

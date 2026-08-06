@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Nova — Painel Pessoal</title>
+<title>Dossiê — Painel Pessoal</title>
 <meta name="description" content="Painel pessoal e de trabalho: dashboard, diário literário, acompanhamento AH/SD, demandas de BI, projetos e agenda." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +22,7 @@
     <div class="login-mark">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>
     </div>
-    <h1 class="login-title">Nova</h1>
+    <h1 class="login-title">Dossiê</h1>
     <p class="login-subtitle">Seu painel pessoal e de trabalho — diário, acompanhamentos, demandas, projetos e agenda, tudo num só lugar.</p>
     <button id="google-signin-btn" class="btn btn-google">
       <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
@@ -81,6 +81,10 @@
     <button class="rail-btn" data-view="agenda" data-accent="rust" title="Agenda &amp; Aniversários" aria-label="Agenda e Aniversários">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/><circle cx="8.3" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.7" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg>
       <span class="rail-label">Agenda</span>
+    </button>
+    <button class="rail-btn" data-view="insights" data-accent="primary" title="Insights" aria-label="Insights e indicadores">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V10M10 19V5M16 19v-7M22 19V8"/><path d="M2 19h22"/></svg>
+      <span class="rail-label">Insights</span>
     </button>
     <button class="rail-btn" data-view="atividade" data-accent="primary" title="Atividade Geral" aria-label="Linha do tempo de atividade geral">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
@@ -618,7 +622,54 @@
       </div>
     </section>
 
-    <!-- VIEW 6 — Atividade Geral (timeline) -->
+    <!-- VIEW 6 — Insights -->
+    <section class="view" id="view-insights" data-accent="primary">
+      <header class="view-header">
+        <div class="view-header-title">
+          <span class="view-icon insights-view-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V10M10 19V5M16 19v-7M22 19V8"/><path d="M2 19h22"/></svg>
+          </span>
+          <div><h2 class="view-title">Insights</h2><p class="view-subtitle">Uma leitura objetiva da sua evolução e produtividade.</p></div>
+        </div>
+        <label class="insights-period-label">Período
+          <select id="insights-period" class="input select">
+            <option value="30">Últimos 30 dias</option>
+            <option value="90" selected>Últimos 90 dias</option>
+            <option value="180">Últimos 6 meses</option>
+            <option value="365">Último ano</option>
+            <option value="all">Todo o período</option>
+          </select>
+        </label>
+      </header>
+
+      <div class="insights-kpis" id="insights-kpis"></div>
+
+      <div class="insights-grid">
+        <article class="glass-card insights-card insights-card-wide">
+          <div class="insights-card-head"><div><h3>Evolução mensal</h3><p>Itens criados e concluídos</p></div><div class="chart-legend"><span><i class="legend-dot created"></i>Criados</span><span><i class="legend-dot completed"></i>Concluídos</span></div></div>
+          <div id="insights-monthly-chart" class="monthly-chart"></div>
+        </article>
+        <article class="glass-card insights-card">
+          <div class="insights-card-head"><div><h3>Fluxo de demandas</h3><p>Distribuição atual por status</p></div></div>
+          <div id="insights-task-status" class="status-insight"></div>
+        </article>
+        <article class="glass-card insights-card">
+          <div class="insights-card-head"><div><h3>Consistência dos hábitos</h3><p>Execução dentro do período</p></div></div>
+          <div id="insights-habits" class="insights-ranked-list"></div>
+        </article>
+        <article class="glass-card insights-card">
+          <div class="insights-card-head"><div><h3>Progresso das metas</h3><p>Metas com maior avanço</p></div></div>
+          <div id="insights-goals" class="insights-ranked-list"></div>
+        </article>
+        <article class="glass-card insights-card insights-card-wide">
+          <div class="insights-card-head"><div><h3>Leitura do período</h3><p>Destaques calculados a partir dos seus dados</p></div></div>
+          <div id="insights-summary" class="insights-summary"></div>
+        </article>
+      </div>
+      <p class="insights-note">O tempo de conclusão usa o primeiro registro de 100% no histórico. Na ausência dele, considera a última atualização do item.</p>
+    </section>
+
+    <!-- VIEW 7 — Atividade Geral (timeline) -->
     <section class="view" id="view-atividade" data-accent="primary">
       <header class="view-header">
         <div class="view-header-title">
