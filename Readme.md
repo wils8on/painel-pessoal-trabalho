@@ -104,7 +104,7 @@ Troque `"seuemail@gmail.com"` pelo e-mail da sua conta Google.
 | `diaryEntries` | title, category, book, status, tags[], attachments[] ({url,name,format,resourceType}), content, userId, createdAt                                                        | Diário & Ideias Literárias |
 | `ahsdNotes`    | dateTime, content, tags[], userId, createdAt                                                                                                                             | Avaliação AH/SD            |
 | `kanbanTasks`  | title, description, status, completedAt, userId, createdAt                                                                                                               | Demandas de Trabalho & BI  |
-| `projects`     | title, category, priority, status, start, deadline, description, nextSteps, progress, progressLog[], completedAt, userId, createdAt                                      | Projetos & Planos          |
+| `projects`     | title, category, priority, status, start, deadline, description, nextSteps, nextAction, hoursEstimated, hoursSpent, risks[], checklist[], usefulLinks[], dependencyProjectIds[], progress, progressLog[], completedAt, userId, createdAt | Projetos & Planos          |
 | `agendaEvents` | title, date, notes, userId, createdAt                                                                                                                                    | Agenda (eventos)           |
 | `birthdays`    | name, day, month, userId, createdAt                                                                                                                                      | Agenda (aniversários)      |
 | `goals`        | title, category, priority, status, deadline, description, progress, progressLog[], completedAt, linkedProjectIds[], linkedTaskIds[], linkedHabitIds[], userId, createdAt | Metas                      |
@@ -121,7 +121,7 @@ Todas as coleções são criadas automaticamente pelo Firestore na primeira grav
 - O editor do Diário aceita uma sintaxe leve de Markdown: `# título`, `**negrito**`, `*itálico*` e listas com `- item`.
 - Todas as consultas ao Firestore filtram apenas por `userId` (sem `orderBy` composto), e a ordenação final é feita no navegador — isso evita a necessidade de criar índices compostos manualmente no console do Firebase.
 
-## Roadmap — "Life OS" (Fases 1, 2 e 3 concluídas)
+## Roadmap — "Life OS" (Fases 1 a 4 concluídas)
 
 O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos implementando por fases, para não comprometer a qualidade numa única entrega.
 
@@ -147,9 +147,15 @@ O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos impl
 - ✅ Evolução mensal de criação e conclusão, distribuição das demandas por status e rankings de hábitos e metas.
 - ✅ Leitura automática do período com taxa de conversão, hábito mais consistente e progresso médio das metas.
 
+**Fase 4 — Projetos avançados:**
+
+- ✅ Próxima ação destacada, horas estimadas/gastas e riscos ou impedimentos.
+- ✅ Checklist estruturado e clicável, com cálculo automático do progresso e registro no histórico.
+- ✅ Links úteis e dependências entre projetos, com navegação direta entre os cards relacionados.
+- ✅ Saúde dos projetos integrada à leitura automática da tela de Insights.
+
 **Ainda não implementado** (próximas fases):
 
-- Campos avançados em **Projetos** (horas gastas, checklist, links úteis, riscos, dependências, "próxima ação")
 - Evolução de **Demandas** para visual Trello/Linear (esforço, etiquetas, recorrência, comentários)
 - Campos de contexto no **Diário** (humor, energia, sono, local, clima) e editor Markdown completo
 - Evolução de **Ideias Literárias** (status, tipo, vínculos com personagens/livros/universos)

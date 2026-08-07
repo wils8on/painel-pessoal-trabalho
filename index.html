@@ -397,6 +397,25 @@
         </div>
         <textarea id="projeto-desc" class="input textarea" rows="3" placeholder="Descrição / objetivo do projeto"></textarea>
         <textarea id="projeto-next" class="input textarea" rows="2" placeholder="Próximos passos (opcional)"></textarea>
+        <input type="text" id="projeto-next-action" class="input" placeholder="Próxima ação concreta (ex: Agendar reunião com a equipe)" />
+        <div class="form-row form-row-2">
+          <label class="field-label">Horas estimadas<input type="number" id="projeto-hours-estimated" class="input mono" min="0" step="0.5" placeholder="0" /></label>
+          <label class="field-label">Horas gastas<input type="number" id="projeto-hours-spent" class="input mono" min="0" step="0.5" placeholder="0" /></label>
+        </div>
+        <textarea id="projeto-risks" class="input textarea" rows="2" placeholder="Riscos e impedimentos — um por linha (opcional)"></textarea>
+
+        <div class="project-form-section">
+          <div class="project-form-section-head"><div><strong>Checklist</strong><span>O progresso será calculado pelos itens concluídos.</span></div><button type="button" class="btn btn-ghost btn-sm" id="projeto-checklist-add">+ Item</button></div>
+          <div id="projeto-checklist-editor" class="project-list-editor"></div>
+        </div>
+        <div class="project-form-section">
+          <div class="project-form-section-head"><div><strong>Links úteis</strong><span>Documentos, dashboards e referências.</span></div><button type="button" class="btn btn-ghost btn-sm" id="projeto-link-add">+ Link</button></div>
+          <div id="projeto-links-editor" class="project-list-editor"></div>
+        </div>
+        <div class="project-form-section">
+          <div class="project-form-section-head"><div><strong>Dependências</strong><span>Projetos que precisam avançar antes deste.</span></div></div>
+          <div id="projeto-dependencies" class="tag-toggle-group"></div>
+        </div>
         <label class="range-label">Progresso atual: <span id="projeto-progress-value">0</span>%</label>
         <input type="range" id="projeto-progress" min="0" max="100" value="0" class="range" />
         <p class="field-hint">Depois de criar o projeto, você pode registrar novas atualizações de progresso direto no card, com data e observação — sem precisar reabrir este formulário.</p>

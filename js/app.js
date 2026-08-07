@@ -628,9 +628,61 @@ $$(".kanban-dropzone").forEach((zone) => {
 ========================================================= */
 let projectItems = [];
 const projetoForm = $("#projeto-form-wrap");
+let projetoChecklistDraft = [];
+let projetoLinksDraft = [];
+let projetoDependencyDraft = [];
 
 const PRIORITY_BADGE = { Baixa: "badge-baixa", Media: "badge-media", Alta: "badge-alta", Critica: "badge-critica" };
 const PRIORITY_LABEL = { Baixa: "Baixa", Media: "Média", Alta: "Alta", Critica: "Crítica" };
+
+function projectDraftId() {
+  return globalThis.crypto?.randomUUID?.() || `item-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function renderProjectChecklistEditor() {
+  $("#projeto-checklist-editor").innerHTML = projetoChecklistDraft.length ? projetoChecklistDraft.map((item) => `
+    <div class="project-editor-row" data-id="${item.id}">
+      <input type="checkbox" data-field="done" ${item.done ? "checked" : ""} aria-label="Item concluído" />
+      <input type="text" class="input" data-field="text" value="${escapeHtml(item.text)}" placeholder="Descreva a entrega" />
+      <button type="button" class="project-editor-remove" data-action="remove" aria-label="Remover item">×</button>
+    </div>`).join("") : `<p class="project-editor-empty">Nenhum item. Adicione entregas para calcular o progresso automaticamente.</p>`;
+  const completed = projetoChecklistDraft.filter((item) => item.done).length;
+  $("#projeto-progress").disabled = projetoChecklistDraft.length > 0;
+  if (projetoChecklistDraft.length) {
+    const progress = Math.round(completed / projetoChecklistDraft.length * 100);
+    $("#projeto-progress").value = progress;
+    $("#projeto-progress-value").textContent = progress;
+  }
+}
+
+function renderProjectLinksEditor() {
+  $("#projeto-links-editor").innerHTML = projetoLinksDraft.length ? projetoLinksDraft.map((link) => `
+    <div class="project-editor-row project-link-editor-row" data-id="${link.id}">
+      <input type="text" class="input" data-field="label" value="${escapeHtml(link.label)}" placeholder="Nome do link" />
+      <input type="url" class="input" data-field="url" value="${escapeHtml(link.url)}" placeholder="https://…" />
+      <button type="button" class="project-editor-remove" data-action="remove" aria-label="Remover link">×</button>
+    </div>`).join("") : `<p class="project-editor-empty">Nenhum link adicionado.</p>`;
+}
+
+function renderProjectDependencies() {
+  const editingId = $("#projeto-edit-id").value;
+  const available = projectItems.filter((project) => project.id !== editingId);
+  $("#projeto-dependencies").innerHTML = available.length ? available.map((project) => `
+    <button type="button" class="tag-toggle ${projetoDependencyDraft.includes(project.id) ? "active" : ""}" data-id="${project.id}">${escapeHtml(project.title)}</button>`).join("") : `<span class="project-editor-empty">Nenhum outro projeto disponível.</span>`;
+}
+
+$("#projeto-checklist-add").addEventListener("click", () => { projetoChecklistDraft.push({ id: projectDraftId(), text: "", done: false }); renderProjectChecklistEditor(); });
+$("#projeto-link-add").addEventListener("click", () => { projetoLinksDraft.push({ id: projectDraftId(), label: "", url: "" }); renderProjectLinksEditor(); });
+$("#projeto-checklist-editor").addEventListener("input", (event) => {
+  const row = event.target.closest(".project-editor-row"); if (!row) return;
+  const item = projetoChecklistDraft.find((entry) => entry.id === row.dataset.id); if (!item) return;
+  item[event.target.dataset.field] = event.target.type === "checkbox" ? event.target.checked : event.target.value;
+  if (event.target.type === "checkbox") renderProjectChecklistEditor();
+});
+$("#projeto-checklist-editor").addEventListener("click", (event) => { if (event.target.dataset.action !== "remove") return; projetoChecklistDraft = projetoChecklistDraft.filter((item) => item.id !== event.target.closest(".project-editor-row").dataset.id); renderProjectChecklistEditor(); });
+$("#projeto-links-editor").addEventListener("input", (event) => { const row = event.target.closest(".project-editor-row"); const link = projetoLinksDraft.find((entry) => entry.id === row?.dataset.id); if (link) link[event.target.dataset.field] = event.target.value; });
+$("#projeto-links-editor").addEventListener("click", (event) => { if (event.target.dataset.action !== "remove") return; projetoLinksDraft = projetoLinksDraft.filter((link) => link.id !== event.target.closest(".project-editor-row").dataset.id); renderProjectLinksEditor(); });
+$("#projeto-dependencies").addEventListener("click", (event) => { const button = event.target.closest(".tag-toggle"); if (!button) return; projetoDependencyDraft = projetoDependencyDraft.includes(button.dataset.id) ? projetoDependencyDraft.filter((id) => id !== button.dataset.id) : [...projetoDependencyDraft, button.dataset.id]; renderProjectDependencies(); });
 
 $("#projeto-new-btn").addEventListener("click", () => {
   $("#projeto-edit-id").value = "";
@@ -642,6 +694,14 @@ $("#projeto-new-btn").addEventListener("click", () => {
   $("#projeto-deadline").value = "";
   $("#projeto-desc").value = "";
   $("#projeto-next").value = "";
+  $("#projeto-next-action").value = "";
+  $("#projeto-hours-estimated").value = "";
+  $("#projeto-hours-spent").value = "";
+  $("#projeto-risks").value = "";
+  projetoChecklistDraft = [];
+  projetoLinksDraft = [];
+  projetoDependencyDraft = [];
+  renderProjectChecklistEditor(); renderProjectLinksEditor(); renderProjectDependencies();
   $("#projeto-progress").value = 0;
   $("#projeto-progress-value").textContent = 0;
   projetoForm.classList.remove("hidden");
@@ -655,10 +715,13 @@ $("#projeto-filter-status").addEventListener("change", () => renderProjects());
 $("#projeto-save-btn").addEventListener("click", async () => {
   const title = $("#projeto-title").value.trim();
   if (!title) return showToast("Informe o nome do projeto.", "error");
-  const newProgress = Number($("#projeto-progress").value);
+  let newProgress = Number($("#projeto-progress").value);
   const editId = $("#projeto-edit-id").value;
   const existing = editId ? projectItems.find((i) => i.id === editId) : null;
   const existingLog = existing?.progressLog || [];
+  const checklist = projetoChecklistDraft.map((item) => ({ id: item.id, text: item.text.trim(), done: Boolean(item.done) })).filter((item) => item.text);
+  const usefulLinks = projetoLinksDraft.map((link) => ({ id: link.id, label: link.label.trim(), url: link.url.trim() })).filter((link) => link.label && link.url);
+  if (checklist.length) newProgress = Math.round(checklist.filter((item) => item.done).length / checklist.length * 100);
 
   const payload = {
     title,
@@ -669,6 +732,13 @@ $("#projeto-save-btn").addEventListener("click", async () => {
     deadline: $("#projeto-deadline").value || null,
     description: $("#projeto-desc").value.trim(),
     nextSteps: $("#projeto-next").value.trim(),
+    nextAction: $("#projeto-next-action").value.trim(),
+    hoursEstimated: Math.max(0, Number($("#projeto-hours-estimated").value) || 0),
+    hoursSpent: Math.max(0, Number($("#projeto-hours-spent").value) || 0),
+    risks: $("#projeto-risks").value.split("\n").map((risk) => risk.trim()).filter(Boolean),
+    checklist,
+    usefulLinks,
+    dependencyProjectIds: projetoDependencyDraft,
     progress: newProgress,
     completedAt: ($("#projeto-status").value === "Concluido" || newProgress >= 100) ? (existing?.completedAt || new Date().toISOString()) : null,
   };
@@ -706,6 +776,24 @@ async function quickUpdateProgress(id, percent, note) {
   }
 }
 
+async function toggleProjectChecklistItem(projectId, checklistId) {
+  const project = projectItems.find((item) => item.id === projectId);
+  if (!project) return;
+  const checklist = (project.checklist || []).map((item) => item.id === checklistId ? { ...item, done: !item.done } : item);
+  const progress = checklist.length ? Math.round(checklist.filter((item) => item.done).length / checklist.length * 100) : (project.progress || 0);
+  const progressLog = progress !== project.progress ? [...(project.progressLog || []), { date: new Date().toISOString(), percent: progress, note: "Checklist atualizado" }] : (project.progressLog || []);
+  try {
+    await projectsApi.update(projectId, { checklist, progress, progressLog, completedAt: progress >= 100 ? (project.completedAt || new Date().toISOString()) : null });
+  } catch (err) {
+    console.error(err);
+    showToast("Não foi possível atualizar o checklist.", "error");
+  }
+}
+
+function safeProjectUrl(raw = "") {
+  try { const url = new URL(raw); return ["http:", "https:"].includes(url.protocol) ? url.href : ""; } catch { return ""; }
+}
+
 function openProjectEntry(id) {
   const item = projectItems.find((i) => i.id === id);
   if (!item) return;
@@ -719,6 +807,14 @@ function openProjectEntry(id) {
   $("#projeto-deadline").value = item.deadline || "";
   $("#projeto-desc").value = item.description || "";
   $("#projeto-next").value = item.nextSteps || "";
+  $("#projeto-next-action").value = item.nextAction || "";
+  $("#projeto-hours-estimated").value = item.hoursEstimated || "";
+  $("#projeto-hours-spent").value = item.hoursSpent || "";
+  $("#projeto-risks").value = (item.risks || []).join("\n");
+  projetoChecklistDraft = (item.checklist || []).map((entry) => ({ id: entry.id || projectDraftId(), text: entry.text || "", done: Boolean(entry.done) }));
+  projetoLinksDraft = (item.usefulLinks || []).map((entry) => ({ id: entry.id || projectDraftId(), label: entry.label || "", url: entry.url || "" }));
+  projetoDependencyDraft = [...(item.dependencyProjectIds || [])];
+  renderProjectChecklistEditor(); renderProjectLinksEditor(); renderProjectDependencies();
   $("#projeto-progress").value = item.progress || 0;
   $("#projeto-progress-value").textContent = item.progress || 0;
   projetoForm.classList.remove("hidden");
@@ -737,6 +833,11 @@ function renderProjects(items) {
     const overdue = item.deadline && item.deadline < todayStr && item.status !== "Concluido";
     const priorityClass = PRIORITY_BADGE[item.priority] || "badge-media";
     const log = item.progressLog || [];
+    const checklist = item.checklist || [];
+    const checklistDone = checklist.filter((entry) => entry.done).length;
+    const dependencies = (item.dependencyProjectIds || []).map((id) => projectItems.find((project) => project.id === id)).filter(Boolean);
+    const validLinks = (item.usefulLinks || []).map((link) => ({ ...link, safeUrl: safeProjectUrl(link.url) })).filter((link) => link.safeUrl);
+    const hourPct = item.hoursEstimated ? Math.min(100, Math.round((item.hoursSpent || 0) / item.hoursEstimated * 100)) : 0;
     const logEntriesHtml = [...log].reverse().map((entry) => `
       <div class="progress-log-entry">
         <span class="log-date">${fmtDateTime(new Date(entry.date))}</span>
@@ -756,6 +857,12 @@ function renderProjects(items) {
       <h3 class="entry-title">${escapeHtml(item.title)}</h3>
       ${item.description ? `<p class="entry-body">${escapeHtml(item.description)}</p>` : ""}
       ${item.nextSteps ? `<p class="entry-body"><strong>Próximos passos:</strong> ${escapeHtml(item.nextSteps)}</p>` : ""}
+      ${item.nextAction ? `<div class="project-next-action"><span>Próxima ação</span><strong>${escapeHtml(item.nextAction)}</strong></div>` : ""}
+      ${checklist.length ? `<div class="project-card-checklist"><div class="project-card-section-title"><span>Checklist</span><small>${checklistDone}/${checklist.length}</small></div>${checklist.map((entry) => `<label class="project-check-item ${entry.done ? "done" : ""}"><input type="checkbox" data-action="toggle-check" data-project-id="${item.id}" data-check-id="${entry.id}" ${entry.done ? "checked" : ""}/><span>${escapeHtml(entry.text)}</span></label>`).join("")}</div>` : ""}
+      ${(item.hoursEstimated || item.hoursSpent) ? `<div class="project-hours"><div class="project-card-section-title"><span>Horas</span><small>${item.hoursSpent || 0}h / ${item.hoursEstimated || 0}h</small></div>${item.hoursEstimated ? `<div class="project-hours-track"><span class="${(item.hoursSpent || 0) > item.hoursEstimated ? "over" : ""}" style="width:${hourPct}%"></span></div>` : ""}</div>` : ""}
+      ${(item.risks || []).length ? `<div class="project-risks"><strong>Riscos e impedimentos</strong>${item.risks.map((risk) => `<span>⚠ ${escapeHtml(risk)}</span>`).join("")}</div>` : ""}
+      ${dependencies.length ? `<div class="project-card-links"><span class="project-card-section-label">Depende de:</span>${dependencies.map((project) => `<button type="button" class="linked-chip" data-action="open-dependency" data-id="${project.id}">📁 ${escapeHtml(project.title)}</button>`).join("")}</div>` : ""}
+      ${validLinks.length ? `<div class="project-card-links"><span class="project-card-section-label">Links:</span>${validLinks.map((link) => `<a class="project-link-chip" href="${escapeHtml(link.safeUrl)}" target="_blank" rel="noopener noreferrer">↗ ${escapeHtml(link.label)}</a>`).join("")}</div>` : ""}
       <div class="entry-meta">
         ${item.start ? `<span>Início: ${fmtDate(new Date(item.start + "T00:00:00"))}</span>` : ""}
         ${item.deadline ? `<span>Prazo: ${fmtDate(new Date(item.deadline + "T00:00:00"))}</span>` : ""}
@@ -802,6 +909,8 @@ function renderProjects(items) {
     const note = $(`#quick-note-${id}`).value;
     await quickUpdateProgress(id, percent, note);
   }));
+  $$('#projeto-list [data-action="toggle-check"]').forEach((input) => input.addEventListener("change", () => toggleProjectChecklistItem(input.dataset.projectId, input.dataset.checkId)));
+  $$('#projeto-list [data-action="open-dependency"]').forEach((btn) => btn.addEventListener("click", () => openProjectEntry(btn.dataset.id)));
   $$('#projeto-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openProjectEntry(btn.dataset.id)));
   $$('#projeto-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir este projeto?")) { projectsApi.remove(btn.dataset.id); showToast("Projeto excluído."); }
@@ -1724,10 +1833,14 @@ function renderInsights() {
   const completionRate = createdCount ? Math.round(completedInPeriod.length / createdCount * 100) : 0;
   const bestHabit = habitScores[0];
   const activeGoals = goalItems.filter((goal) => goal.status !== "Concluida");
+  const activeInsightProjects = projectItems.filter((project) => project.status !== "Concluido");
+  const projectsAtRisk = activeInsightProjects.filter((project) => (project.risks || []).length || (project.hoursEstimated > 0 && project.hoursSpent > project.hoursEstimated));
+  const projectsWithoutAction = activeInsightProjects.filter((project) => !project.nextAction).length;
   $("#insights-summary").innerHTML = `
     <div class="insight-summary-item"><span class="insight-summary-emoji">✓</span><strong>${completionRate}% de conversão</strong><br>${completedInPeriod.length} conclusão(ões) para ${createdCount} novo(s) item(ns) no período.</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">↻</span>${bestHabit ? `<strong>${escapeHtml(bestHabit.title)}</strong><br>É seu hábito mais consistente, com ${bestHabit.score}% de aderência.` : "Cadastre hábitos para descobrir seu ritmo mais consistente."}</div>
-    <div class="insight-summary-item"><span class="insight-summary-emoji">◎</span>${avgGoalProgress === null ? "Cadastre metas para acompanhar sua evolução." : `<strong>${avgGoalProgress}% de progresso médio</strong><br>em ${activeGoals.length} meta(s) ainda ativa(s).`}</div>`;
+    <div class="insight-summary-item"><span class="insight-summary-emoji">◎</span>${avgGoalProgress === null ? "Cadastre metas para acompanhar sua evolução." : `<strong>${avgGoalProgress}% de progresso médio</strong><br>em ${activeGoals.length} meta(s) ainda ativa(s).`}</div>
+    <div class="insight-summary-item"><span class="insight-summary-emoji">▣</span>${activeInsightProjects.length ? `<strong>${projectsAtRisk.length} projeto(s) em atenção</strong><br>${projectsWithoutAction} sem próxima ação definida.` : "Cadastre projetos para acompanhar riscos e execução."}</div>`;
 }
 
 $("#insights-period").addEventListener("change", renderInsights);
