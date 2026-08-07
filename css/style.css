@@ -95,6 +95,7 @@ body {
   transition: background 0.3s ease, color 0.25s ease;
 }
 .hidden { display: none !important; }
+.skip-link { position: fixed; left: 1rem; top: -60px; z-index: 1000; background: var(--surface-solid); color: var(--ink); padding: .6rem 1rem; border-radius: var(--radius-sm); border: 2px solid var(--primary-2); }.skip-link:focus { top: 1rem; }
 .connection-banner { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 500; background: var(--amber); color: #211400; padding: .45rem 1rem; border-radius: 0 0 10px 10px; font-size: .76rem; font-weight: 600; box-shadow: var(--shadow-md); }.app-loading { position: fixed; inset: 0; z-index: 400; display: grid; place-content: center; justify-items: center; gap: .7rem; background: rgba(11,10,20,.82); backdrop-filter: blur(12px); }.app-loading span { width: 34px; height: 34px; border: 3px solid var(--border-strong); border-top-color: var(--primary-2); border-radius: 50%; animation: loading-spin .8s linear infinite; }.app-loading p { color: #F3F1FB; font-size: .82rem; }@keyframes loading-spin{to{transform:rotate(360deg)}}
 button { font-family: inherit; cursor: pointer; }
 input, textarea, select { font-family: inherit; }

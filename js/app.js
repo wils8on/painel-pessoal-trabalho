@@ -4,6 +4,7 @@
 // =========================================================
 import { auth, db, googleProvider } from "./firebase-config.js";
 import { uploadFileToCloudinary } from "./cloudinary-config.js";
+import { clampPercent, checklistProgress, safeHttpUrl, nextRecurringDate, validateBackup } from "./core-utils.js";
 import {
   signInWithPopup,
   signOut,
@@ -238,10 +239,17 @@ function startAllModules(uid) {
   habitsApi.subscribe(uid, renderHabits);
 }
 
+function recordClientError(error, source = "app") {
+  const entry = { time: new Date().toISOString(), source, message: String(error?.message || error || "Erro desconhecido").slice(0, 500) };
+  try { const history = JSON.parse(localStorage.getItem("nova-error-log") || "[]"); localStorage.setItem("nova-error-log", JSON.stringify([...history, entry].slice(-20))); } catch { /* armazenamento indisponível */ }
+}
+window.addEventListener("error", (event) => recordClientError(event.error || event.message, "window"));
+window.addEventListener("unhandledrejection", (event) => { recordClientError(event.reason, "promise"); showToast("Ocorreu um erro inesperado. A ocorrência foi registrada localmente.", "error"); });
+
 const BACKUP_COLLECTIONS = { diaryEntries: { api: diaryApi, get: () => diaryItems }, ahsdNotes: { api: ahsdApi, get: () => ahsdItems }, kanbanTasks: { api: kanbanApi, get: () => kanbanItems }, projects: { api: projectsApi, get: () => projectItems }, agendaEvents: { api: eventsApi, get: () => eventItems }, birthdays: { api: birthdaysApi, get: () => birthdayItems }, goals: { api: goalsApi, get: () => goalItems }, habits: { api: habitsApi, get: () => habitItems } };
 $("#backup-export-btn").addEventListener("click", () => { if (!currentUser) return; const data = { version: 1, exportedAt: new Date().toISOString(), collections: Object.fromEntries(Object.entries(BACKUP_COLLECTIONS).map(([name, config]) => [name, config.get()])) }; const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const link = document.createElement("a"); link.href = url; link.download = `nova-backup-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(url); showToast("Backup exportado."); });
 $("#backup-import-btn").addEventListener("click", () => $("#backup-import-file").click());
-$("#backup-import-file").addEventListener("change", async (event) => { const file = event.target.files?.[0]; if (!file || !currentUser) return; try { const backup = JSON.parse(await file.text()); if (!backup.collections || !confirm("Restaurar este backup? Os registros serão adicionados e dados existentes não serão apagados.")) return; let count = 0; for (const [name, items] of Object.entries(backup.collections)) { const config = BACKUP_COLLECTIONS[name]; if (!config || !Array.isArray(items)) continue; for (const raw of items) { const { id, userId, createdAt, updatedAt, ...data } = raw; await config.api.add(currentUser.uid, data); count++; } } showToast(`${count} registro(s) restaurado(s).`); } catch (err) { console.error(err); showToast("Backup inválido ou não foi possível restaurar.", "error"); } finally { event.target.value = ""; } });
+$("#backup-import-file").addEventListener("change", async (event) => { const file = event.target.files?.[0]; if (!file || !currentUser) return; try { if (file.size > 25 * 1024 * 1024) throw new Error("Backup excede 25 MB"); const backup = JSON.parse(await file.text()); if (!validateBackup(backup, Object.keys(BACKUP_COLLECTIONS))) throw new Error("Estrutura de backup inválida"); if (!confirm("Restaurar este backup? Os registros serão adicionados e dados existentes não serão apagados.")) return; let count = 0; for (const [name, items] of Object.entries(backup.collections)) { const config = BACKUP_COLLECTIONS[name]; for (const raw of items) { const { id, userId, createdAt, updatedAt, ...data } = raw; await config.api.add(currentUser.uid, data); count++; } } showToast(`${count} registro(s) restaurado(s).`); } catch (err) { console.error(err); showToast(err.message || "Backup inválido ou não foi possível restaurar.", "error"); } finally { event.target.value = ""; } });
 
 function updateConnectionState() { const offline = !navigator.onLine; $("#connection-banner").classList.toggle("hidden", !offline); document.body.classList.toggle("is-offline", offline); if (!offline) showToast("Conexão restabelecida."); }
 window.addEventListener("offline", updateConnectionState); window.addEventListener("online", updateConnectionState); updateConnectionState();
@@ -709,10 +717,9 @@ $$(".kanban-dropzone").forEach((zone) => {
     const existing = kanbanItems.find((item) => item.id === id);
     await kanbanApi.update(id, { status, completedAt: status === "done" ? (existing?.completedAt || new Date().toISOString()) : null });
     if (status === "done" && existing?.recurrence && !existing.recurrenceGeneratedAt) {
-      let nextDeadline = existing.deadline ? new Date(existing.deadline + "T00:00:00") : new Date();
-      if (existing.recurrence === "semanal") nextDeadline.setDate(nextDeadline.getDate() + 7); else nextDeadline.setMonth(nextDeadline.getMonth() + 1);
+      const nextDeadline = nextRecurringDate(existing.deadline, existing.recurrence);
       const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, completedAt: _completedAt, status: _status, comments: _comments, recurrenceGeneratedAt: _generated, userId: _userId, ...copy } = existing;
-      await kanbanApi.add(currentUser.uid, { ...copy, title: existing.title, status: "todo", deadline: nextDeadline.toISOString().slice(0, 10), checklist: (existing.checklist || []).map((item) => ({ ...item, done: false })), comments: [] });
+      await kanbanApi.add(currentUser.uid, { ...copy, title: existing.title, status: "todo", deadline: nextDeadline, checklist: (existing.checklist || []).map((item) => ({ ...item, done: false })), comments: [] });
       await kanbanApi.update(id, { recurrenceGeneratedAt: new Date().toISOString() });
       showToast("Próxima demanda recorrente criada.");
     }
@@ -821,13 +828,16 @@ $("#projeto-save-btn").addEventListener("click", async () => {
   const existingLog = existing?.progressLog || [];
   const checklist = projetoChecklistDraft.map((item) => ({ id: item.id, text: item.text.trim(), done: Boolean(item.done) })).filter((item) => item.text);
   const usefulLinks = projetoLinksDraft.map((link) => ({ id: link.id, label: link.label.trim(), url: link.url.trim() })).filter((link) => link.label && link.url);
-  if (checklist.length) newProgress = Math.round(checklist.filter((item) => item.done).length / checklist.length * 100);
+  if (checklist.length) newProgress = checklistProgress(checklist, newProgress);
+  let projectStatus = $("#projeto-status").value;
+  if (projectStatus === "Concluido") newProgress = 100;
+  if (newProgress >= 100) projectStatus = "Concluido";
 
   const payload = {
     title,
     category: $("#projeto-category").value,
     priority: $("#projeto-priority").value,
-    status: $("#projeto-status").value,
+    status: projectStatus,
     start: $("#projeto-start").value || null,
     deadline: $("#projeto-deadline").value || null,
     description: $("#projeto-desc").value.trim(),
@@ -840,7 +850,7 @@ $("#projeto-save-btn").addEventListener("click", async () => {
     usefulLinks,
     dependencyProjectIds: projetoDependencyDraft,
     progress: newProgress,
-    completedAt: ($("#projeto-status").value === "Concluido" || newProgress >= 100) ? (existing?.completedAt || new Date().toISOString()) : null,
+    completedAt: projectStatus === "Concluido" ? (existing?.completedAt || new Date().toISOString()) : null,
   };
 
   // Só registra uma entrada no histórico se o progresso realmente mudou
@@ -865,10 +875,10 @@ $("#projeto-save-btn").addEventListener("click", async () => {
 async function quickUpdateProgress(id, percent, note) {
   const item = projectItems.find((i) => i.id === id);
   if (!item) return;
-  const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
+  const clamped = clampPercent(percent);
   const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: clamped, note: note?.trim() || "" }];
   try {
-    await projectsApi.update(id, { progress: clamped, progressLog: log, completedAt: clamped >= 100 ? (item.completedAt || new Date().toISOString()) : null });
+    await projectsApi.update(id, { progress: clamped, status: clamped >= 100 ? "Concluido" : (item.status === "Concluido" ? "Em andamento" : item.status), progressLog: log, completedAt: clamped >= 100 ? (item.completedAt || new Date().toISOString()) : null });
     showToast("Progresso atualizado.");
   } catch (err) {
     console.error(err);
@@ -880,10 +890,10 @@ async function toggleProjectChecklistItem(projectId, checklistId) {
   const project = projectItems.find((item) => item.id === projectId);
   if (!project) return;
   const checklist = (project.checklist || []).map((item) => item.id === checklistId ? { ...item, done: !item.done } : item);
-  const progress = checklist.length ? Math.round(checklist.filter((item) => item.done).length / checklist.length * 100) : (project.progress || 0);
+  const progress = checklistProgress(checklist, project.progress || 0);
   const progressLog = progress !== project.progress ? [...(project.progressLog || []), { date: new Date().toISOString(), percent: progress, note: "Checklist atualizado" }] : (project.progressLog || []);
   try {
-    await projectsApi.update(projectId, { checklist, progress, progressLog, completedAt: progress >= 100 ? (project.completedAt || new Date().toISOString()) : null });
+    await projectsApi.update(projectId, { checklist, progress, status: progress >= 100 ? "Concluido" : (project.status === "Concluido" ? "Em andamento" : project.status), progressLog, completedAt: progress >= 100 ? (project.completedAt || new Date().toISOString()) : null });
   } catch (err) {
     console.error(err);
     showToast("Não foi possível atualizar o checklist.", "error");
@@ -891,7 +901,7 @@ async function toggleProjectChecklistItem(projectId, checklistId) {
 }
 
 function safeProjectUrl(raw = "") {
-  try { const url = new URL(raw); return ["http:", "https:"].includes(url.protocol) ? url.href : ""; } catch { return ""; }
+  return safeHttpUrl(raw);
 }
 
 function openProjectEntry(id) {
@@ -1094,22 +1104,25 @@ $("#meta-search").addEventListener("input", () => renderGoals());
 $("#meta-save-btn").addEventListener("click", async () => {
   const title = $("#meta-title").value.trim();
   if (!title) return showToast("Informe o título da meta.", "error");
-  const newProgress = Number($("#meta-progress").value);
+  let newProgress = clampPercent($("#meta-progress").value);
   const editId = $("#meta-edit-id").value;
   const existing = editId ? goalItems.find((i) => i.id === editId) : null;
   const existingLog = existing?.progressLog || [];
+  let goalStatus = $("#meta-status").value;
+  if (goalStatus === "Concluida") newProgress = 100;
+  if (newProgress >= 100) goalStatus = "Concluida";
   const payload = {
     title,
     category: $("#meta-category").value,
     priority: $("#meta-priority").value,
-    status: $("#meta-status").value,
+    status: goalStatus,
     deadline: $("#meta-deadline").value || null,
     description: $("#meta-desc").value.trim(),
     progress: newProgress,
     linkedProjectIds: metaLinkProjects,
     linkedTaskIds: metaLinkTasks,
     linkedHabitIds: metaLinkHabits,
-    completedAt: ($("#meta-status").value === "Concluida" || newProgress >= 100) ? (existing?.completedAt || new Date().toISOString()) : null,
+    completedAt: goalStatus === "Concluida" ? (existing?.completedAt || new Date().toISOString()) : null,
   };
   if (!existing || existing.progress !== newProgress) {
     payload.progressLog = [...existingLog, { date: new Date().toISOString(), percent: newProgress, note: existing ? "Atualizado pelo formulário" : "Criação da meta" }];
@@ -1128,10 +1141,10 @@ $("#meta-save-btn").addEventListener("click", async () => {
 async function quickUpdateGoalProgress(id, percent, note) {
   const item = goalItems.find((i) => i.id === id);
   if (!item) return;
-  const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
+  const clamped = clampPercent(percent);
   const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: clamped, note: note?.trim() || "" }];
   try {
-    await goalsApi.update(id, { progress: clamped, progressLog: log, completedAt: clamped >= 100 ? (item.completedAt || new Date().toISOString()) : null });
+    await goalsApi.update(id, { progress: clamped, status: clamped >= 100 ? "Concluida" : (item.status === "Concluida" ? "Em andamento" : item.status), progressLog: log, completedAt: clamped >= 100 ? (item.completedAt || new Date().toISOString()) : null });
     showToast("Progresso atualizado.");
   } catch (err) {
     console.error(err);

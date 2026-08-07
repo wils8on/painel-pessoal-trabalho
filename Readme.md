@@ -121,7 +121,7 @@ Todas as coleções são criadas automaticamente pelo Firestore na primeira grav
 - O editor do Diário aceita uma sintaxe leve de Markdown: `# título`, `**negrito**`, `*itálico*` e listas com `- item`.
 - Todas as consultas ao Firestore filtram apenas por `userId` (sem `orderBy` composto), e a ordenação final é feita no navegador — isso evita a necessidade de criar índices compostos manualmente no console do Firebase.
 
-## Roadmap — "Life OS" (Fases 1 a 10 concluídas)
+## Roadmap — "Life OS" (Fases 1 a 11 concluídas)
 
 O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos implementando por fases, para não comprometer a qualidade numa única entrega.
 
@@ -200,6 +200,20 @@ O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos impl
 - ✅ Proteção contra saída com alterações não salvas.
 - ✅ Atalhos: `/` ou `Ctrl+K` busca, `N` novo item, `Alt+1…0` navegação e `Esc` fechar.
 - ✅ Preferências persistentes, contraste reforçado e refinamentos mobile.
+
+**Fase 11 — Qualidade e estabilização:**
+
+- ✅ Utilitários críticos extraídos para módulo independente e testável.
+- ✅ Testes automatizados de percentuais, checklists, recorrência, URLs e backups.
+- ✅ Verificação automática no GitHub Actions a cada push ou pull request.
+- ✅ Regras do Firestore restritas às coleções conhecidas e sem troca de proprietário.
+- ✅ Validação reforçada de backup, limite de tamanho e coleções permitidas.
+- ✅ Consistência automática entre progresso e status de Projetos e Metas.
+- ✅ Registro local dos últimos erros não tratados e melhorias de acessibilidade.
+
+### Testes e segurança
+
+Execute `npm test` para rodar a suíte de testes. O arquivo `firestore.rules` contém as regras endurecidas; publique-o pelo Firebase CLI ou copie seu conteúdo para **Firestore Database → Regras** no Console do Firebase.
 
 **Ainda não implementado** (próximas fases):
 

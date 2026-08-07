@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function knownCollection(collection) { return collection in ["diaryEntries", "ahsdNotes", "kanbanTasks", "projects", "agendaEvents", "birthdays", "goals", "habits"]; }
+    match /{collection}/{document} {
+      allow create: if signedIn() && knownCollection(collection) && request.resource.data.userId == request.auth.uid;
+      allow read, delete: if signedIn() && knownCollection(collection) && resource.data.userId == request.auth.uid;
+      allow update: if signedIn() && knownCollection(collection) && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}
