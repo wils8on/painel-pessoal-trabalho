@@ -581,6 +581,8 @@ html[data-theme="light"] .icon-moon { display: block; }
 .project-link-chip { font: 0.68rem var(--font-mono); color: var(--primary-2); text-decoration: none; padding: 0.18rem 0.5rem; border: 1px solid var(--border); border-radius: 20px; background: var(--surface-strong); }
 .project-link-chip:hover { border-color: var(--primary-2); }
 
+.people-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: .9rem; }.person-card { padding: 1rem; display: flex; flex-direction: column; gap: .55rem; }.person-head { display: flex; align-items: center; gap: .7rem; }.person-head img,.person-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--rust-soft); color: var(--rust); display: grid; place-items: center; font: 700 1.2rem var(--font-display); }.person-head h3 { margin: 0; font-size: 1rem; }.person-head span { color: var(--ink-muted); font-size: .7rem; }.person-card a { color: var(--primary-2); font-size: .76rem; text-decoration: none; }.person-card p { color: var(--ink-muted); font-size: .78rem; margin: 0; }.contact-due { margin-left: auto; color: var(--rust); font: .62rem var(--font-mono); background: var(--rust-soft); padding: .2rem .45rem; border-radius: 20px; }.person-actions { display: flex; gap: .6rem; margin-top: auto; }.person-actions button { border: none; background: none; color: var(--rust); text-decoration: underline; font-size: .72rem; padding: 0; }
+
 /* ---------------- Tags & capa (Diário) ---------------- */
 .tag-chip {
   font-family: var(--font-mono);

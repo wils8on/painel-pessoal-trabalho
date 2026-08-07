@@ -1450,6 +1450,7 @@ let eventItems = [];
 let birthdayItems = [];
 const eventoForm = $("#evento-form-wrap");
 const niverForm = $("#niver-form-wrap");
+let pessoaProjectLinks = [], pessoaTaskLinks = [];
 
 function populateDaySelect() {
   const select = $("#niver-day");
@@ -1460,7 +1461,17 @@ function populateDaySelect() {
     opt.textContent = String(d).padStart(2, "0");
     select.appendChild(opt);
   }
+  const pessoaDay = $("#pessoa-day"); if (!pessoaDay.options.length) for (let d = 1; d <= 31; d++) pessoaDay.add(new Option(String(d).padStart(2, "0"), String(d)));
 }
+
+function renderPessoaLinks() { const groups = [["#pessoa-projects", projectItems, pessoaProjectLinks], ["#pessoa-tasks", kanbanItems, pessoaTaskLinks]]; groups.forEach(([selector, items, selected]) => { $(selector).innerHTML = items.length ? items.map((item) => `<button type="button" class="tag-toggle ${selected.includes(item.id) ? "active" : ""}" data-id="${item.id}">${escapeHtml(item.title)}</button>`).join("") : `<span class="project-editor-empty">Nenhum item disponível.</span>`; }); }
+[["#pessoa-projects", "project"], ["#pessoa-tasks", "task"]].forEach(([selector, type]) => $(selector).addEventListener("click", (event) => { const btn = event.target.closest(".tag-toggle"); if (!btn) return; const current = type === "project" ? pessoaProjectLinks : pessoaTaskLinks; const next = current.includes(btn.dataset.id) ? current.filter((id) => id !== btn.dataset.id) : [...current, btn.dataset.id]; if (type === "project") pessoaProjectLinks = next; else pessoaTaskLinks = next; renderPessoaLinks(); }));
+function resetPessoaForm() { $("#pessoa-id").value = ""; ["name","email","phone","photo","company","role","last-contact","social","notes"].forEach((field) => $(`#pessoa-${field}`).value = ""); $("#pessoa-category").value = "Amigos"; $("#pessoa-day").value = "1"; $("#pessoa-month").value = "1"; $("#pessoa-frequency").value = 30; pessoaProjectLinks = []; pessoaTaskLinks = []; renderPessoaLinks(); }
+$("#pessoa-new-btn").addEventListener("click", () => { resetPessoaForm(); $("#pessoa-form").classList.remove("hidden"); }); $("#pessoa-cancel").addEventListener("click", () => $("#pessoa-form").classList.add("hidden"));
+$("#pessoa-save").addEventListener("click", async () => { const name = $("#pessoa-name").value.trim(); if (!name) return showToast("Informe o nome.", "error"); const id = $("#pessoa-id").value; const existing = id ? birthdayItems.find((item) => item.id === id) : null; const payload = { name, day: Number($("#pessoa-day").value), month: Number($("#pessoa-month").value), category: $("#pessoa-category").value, email: $("#pessoa-email").value.trim(), phone: $("#pessoa-phone").value.trim(), photoUrl: safeProjectUrl($("#pessoa-photo").value), company: $("#pessoa-company").value.trim(), role: $("#pessoa-role").value.trim(), contactFrequencyDays: Number($("#pessoa-frequency").value) || 30, lastContact: $("#pessoa-last-contact").value || null, socialUrl: safeProjectUrl($("#pessoa-social").value), notes: $("#pessoa-notes").value.trim(), linkedProjectIds: pessoaProjectLinks, linkedTaskIds: pessoaTaskLinks, interactions: existing?.interactions || [] }; if (id) await birthdaysApi.update(id, payload); else await birthdaysApi.add(currentUser.uid, payload); $("#pessoa-form").classList.add("hidden"); showToast("Pessoa salva."); });
+function openPerson(id) { const item = birthdayItems.find((entry) => entry.id === id); if (!item) return; switchView("pessoas"); $("#pessoa-id").value = item.id; $("#pessoa-name").value = item.name; $("#pessoa-category").value = item.category || "Contatos"; $("#pessoa-email").value = item.email || ""; $("#pessoa-phone").value = item.phone || ""; $("#pessoa-photo").value = item.photoUrl || ""; $("#pessoa-company").value = item.company || ""; $("#pessoa-role").value = item.role || ""; $("#pessoa-day").value = item.day; $("#pessoa-month").value = item.month; $("#pessoa-frequency").value = item.contactFrequencyDays || 30; $("#pessoa-last-contact").value = item.lastContact || ""; $("#pessoa-social").value = item.socialUrl || ""; $("#pessoa-notes").value = item.notes || ""; pessoaProjectLinks = [...(item.linkedProjectIds || [])]; pessoaTaskLinks = [...(item.linkedTaskIds || [])]; renderPessoaLinks(); $("#pessoa-form").classList.remove("hidden"); }
+function renderPeople() { if (!$("#pessoa-list")) return; const search = $("#pessoa-search").value.toLowerCase(), category = $("#pessoa-filter-category").value, today = new Date(); const people = birthdayItems.filter((item) => !category || (item.category || "Contatos") === category).filter((item) => !search || `${item.name} ${item.email || ""} ${item.company || ""} ${item.role || ""}`.toLowerCase().includes(search)); $("#pessoa-empty").classList.toggle("hidden", people.length > 0); $("#pessoa-list").innerHTML = people.map((item) => { const last = item.lastContact ? new Date(item.lastContact + "T00:00:00") : null; const days = last ? Math.floor((today-last)/86400000) : null; const due = days === null || days >= (item.contactFrequencyDays || 30); return `<article class="person-card glass-card"><div class="person-head">${item.photoUrl ? `<img src="${escapeHtml(item.photoUrl)}" alt=""/>` : `<span class="person-avatar">${escapeHtml(item.name.charAt(0))}</span>`}<div><h3>${escapeHtml(item.name)}</h3><span>${escapeHtml(item.category || "Contatos")}</span></div>${due ? `<b class="contact-due">Contato pendente</b>` : ""}</div><p class="entry-meta"><span>🎂 ${fmtDayMonth(item.day,item.month)}</span>${item.company ? `<span>${escapeHtml(item.company)}${item.role ? ` · ${escapeHtml(item.role)}` : ""}</span>` : ""}</p>${item.email ? `<a href="mailto:${escapeHtml(item.email)}">${escapeHtml(item.email)}</a>` : ""}${item.phone ? `<a href="tel:${escapeHtml(item.phone)}">${escapeHtml(item.phone)}</a>` : ""}${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ""}<div class="person-actions"><button data-person-contact="${item.id}">Registrar contato</button><button data-person-edit="${item.id}">Editar</button></div></article>`; }).join(""); $$("[data-person-edit]").forEach((btn) => btn.addEventListener("click", () => openPerson(btn.dataset.personEdit))); $$("[data-person-contact]").forEach((btn) => btn.addEventListener("click", async () => { const item = birthdayItems.find((entry) => entry.id === btn.dataset.personContact); const now = new Date().toISOString(); await birthdaysApi.update(item.id, { lastContact: now.slice(0,10), interactions: [...(item.interactions || []), { date: now, note: "Contato registrado" }] }); showToast("Interação registrada."); })); }
+$("#pessoa-search").addEventListener("input", renderPeople); $("#pessoa-filter-category").addEventListener("change", renderPeople);
 
 $("#evento-new-btn").addEventListener("click", () => {
   $("#evento-edit-id").value = "";
@@ -1599,6 +1610,7 @@ function openBirthdayEntry(id) {
 
 function renderBirthdays(items) {
   if (items) birthdayItems = items;
+  renderPeople();
   const monthFilter = $("#niver-filter-month").value;
   const filtered = upcomingBirthdays()
     .filter((i) => !monthFilter || i.month === Number(monthFilter));
@@ -1657,11 +1669,13 @@ function refreshDashboard() {
   const openTasks = kanbanItems.filter((i) => i.status !== "done").length;
   const activeProjects = projectItems.filter((i) => i.status !== "Concluido").length;
   const nextBirthday = upcomingBirthdays(1)[0];
+  const contactDueCount = birthdayItems.filter((person) => { if (!person.lastContact) return Boolean(person.email || person.phone || person.category); return Math.floor((Date.now() - new Date(person.lastContact + "T00:00:00")) / 86400000) >= (person.contactFrequencyDays || 30); }).length;
   const stats = [
     { value: diaryItems.length, label: "Anotações no diário" },
     { value: ahsdItems.length, label: "Registros AH/SD" },
     { value: openTasks, label: "Demandas em aberto" },
     { value: activeProjects, label: "Projetos ativos" },
+    { value: contactDueCount, label: "Contatos pendentes" },
     { value: nextBirthday ? (nextBirthday.isToday ? "Hoje" : `${nextBirthday.daysLeft}d`) : "—", label: nextBirthday ? `Aniversário: ${nextBirthday.name}` : "Próximo aniversário" },
   ];
   $("#dash-stats").innerHTML = stats.map((s) => `
@@ -1934,6 +1948,8 @@ function renderInsights() {
   const moodCounts = contextualEntries.reduce((counts, entry) => { if (entry.mood) counts[entry.mood] = (counts[entry.mood] || 0) + 1; return counts; }, {});
   const frequentMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
   const literaryItems = diaryItems.filter((entry) => ["Capítulo", "Cena", "Personagem", "Plot", "Trama", "Nota de Pesquisa", "Local", "Objeto"].includes(entry.category));
+  const peopleWithContact = birthdayItems.filter((person) => person.email || person.phone || person.category);
+  const relationshipDue = peopleWithContact.filter((person) => !person.lastContact || Math.floor((now - new Date(person.lastContact + "T00:00:00")) / 86400000) >= (person.contactFrequencyDays || 30));
   $("#insights-summary").innerHTML = `
     <div class="insight-summary-item"><span class="insight-summary-emoji">✓</span><strong>${completionRate}% de conversão</strong><br>${completedInPeriod.length} conclusão(ões) para ${createdCount} novo(s) item(ns) no período.</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">↻</span>${bestHabit ? `<strong>${escapeHtml(bestHabit.title)}</strong><br>É seu hábito mais consistente, com ${bestHabit.score}% de aderência.` : "Cadastre hábitos para descobrir seu ritmo mais consistente."}</div>
@@ -1941,7 +1957,8 @@ function renderInsights() {
     <div class="insight-summary-item"><span class="insight-summary-emoji">▣</span>${activeInsightProjects.length ? `<strong>${projectsAtRisk.length} projeto(s) em atenção</strong><br>${projectsWithoutAction} sem próxima ação definida.` : "Cadastre projetos para acompanhar riscos e execução."}</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">▤</span><strong>${openEffort} pontos em aberto</strong><br>${overdueTasks} demanda(s) atrasada(s) em ${openInsightTasks.length} ativa(s).</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">☀</span>${contextualEntries.length ? `<strong>Energia média ${avgEnergy || "—"}/5</strong><br>${avgSleep ? `${avgSleep}h de sono · ` : ""}${frequentMood ? `humor mais frequente: ${escapeHtml(frequentMood)}.` : `${contextualEntries.length} registro(s) contextual(is).`}` : "Registre humor, energia e sono no Diário para revelar padrões pessoais."}</div>
-    <div class="insight-summary-item"><span class="insight-summary-emoji">✦</span><strong>${literaryItems.length} elementos literários</strong><br>${literaryItems.filter((item) => item.maturity === "Pronta").length} ideia(s) pronta(s) em ${new Set(literaryItems.map((item) => item.book).filter(Boolean)).size} obra(s).</div>`;
+    <div class="insight-summary-item"><span class="insight-summary-emoji">✦</span><strong>${literaryItems.length} elementos literários</strong><br>${literaryItems.filter((item) => item.maturity === "Pronta").length} ideia(s) pronta(s) em ${new Set(literaryItems.map((item) => item.book).filter(Boolean)).size} obra(s).</div>
+    <div class="insight-summary-item"><span class="insight-summary-emoji">♙</span><strong>${relationshipDue.length} contatos pendentes</strong><br>${peopleWithContact.length} pessoa(s) com perfil de relacionamento.</div>`;
 }
 
 $("#insights-period").addEventListener("change", renderInsights);

@@ -106,7 +106,7 @@ Troque `"seuemail@gmail.com"` pelo e-mail da sua conta Google.
 | `kanbanTasks`  | title, description, status, priority, effort, deadline, labels[], context, checklist[], comments[], recurrence, recurrenceGeneratedAt, completedAt, userId, createdAt | Demandas de Trabalho & BI  |
 | `projects`     | title, category, priority, status, start, deadline, description, nextSteps, nextAction, hoursEstimated, hoursSpent, risks[], checklist[], usefulLinks[], dependencyProjectIds[], progress, progressLog[], completedAt, userId, createdAt | Projetos & Planos          |
 | `agendaEvents` | title, date, notes, userId, createdAt                                                                                                                                    | Agenda (eventos)           |
-| `birthdays`    | name, day, month, userId, createdAt                                                                                                                                      | Agenda (aniversários)      |
+| `birthdays`    | name, day, month, category, email, phone, photoUrl, company, role, socialUrl, notes, contactFrequencyDays, lastContact, interactions[], linkedProjectIds[], linkedTaskIds[], userId, createdAt | Pessoas e aniversários |
 | `goals`        | title, category, priority, status, deadline, description, progress, progressLog[], completedAt, linkedProjectIds[], linkedTaskIds[], linkedHabitIds[], userId, createdAt | Metas                      |
 | `habits`       | title, emoji, frequency (diario/semanal/mensal), target, completions[] (datas "YYYY-MM-DD"), notes, userId, createdAt                                                    | Hábitos                    |
 
@@ -121,7 +121,7 @@ Todas as coleções são criadas automaticamente pelo Firestore na primeira grav
 - O editor do Diário aceita uma sintaxe leve de Markdown: `# título`, `**negrito**`, `*itálico*` e listas com `- item`.
 - Todas as consultas ao Firestore filtram apenas por `userId` (sem `orderBy` composto), e a ordenação final é feita no navegador — isso evita a necessidade de criar índices compostos manualmente no console do Firebase.
 
-## Roadmap — "Life OS" (Fases 1 a 7 concluídas)
+## Roadmap — "Life OS" (Fases 1 a 8 concluídas)
 
 O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos implementando por fases, para não comprometer a qualidade numa única entrega.
 
@@ -176,9 +176,16 @@ O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos impl
 - ✅ Relações clicáveis entre elementos e painel de cobertura por tipo.
 - ✅ Indicadores literários integrados aos Insights.
 
+**Fase 8 — Pessoas e Relacionamentos:**
+
+- ✅ Aniversários evoluídos para perfis completos de pessoas, sem migração manual.
+- ✅ Contatos, empresa, cargo, categoria, foto, redes sociais e notas.
+- ✅ Frequência desejada de contato, último contato e histórico de interações.
+- ✅ Vínculos com projetos e demandas e alertas de contato pendente.
+- ✅ Indicadores de relacionamento integrados aos Insights.
+
 **Ainda não implementado** (próximas fases):
 
-- Evolução de **Aniversários** para cadastro completo de **Pessoas** (foto, contato, redes sociais, histórico)
 - Mapa de calor de produtividade e gráficos semanais/mensais mais amplos no Dashboard
 - Melhorias de UX mais amplas (drag-and-drop generalizado, skeleton loading, menus de contexto, atalhos adicionais)
 
