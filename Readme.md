@@ -101,7 +101,7 @@ Troque `"seuemail@gmail.com"` pelo e-mail da sua conta Google.
 
 | Coleção        | Campos principais                                                                                                                                                        | Módulo                     |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
-| `diaryEntries` | title, category, book, status, tags[], attachments[] ({url,name,format,resourceType}), content, userId, createdAt                                                        | Diário & Ideias Literárias |
+| `diaryEntries` | title, category, book, status, tags[], attachments[], content, mood, energy, sleepHours, location, weather, favorite, pinned, linkedProjectIds[], linkedGoalIds[], linkedHabitIds[], userId, createdAt | Diário & Ideias Literárias |
 | `ahsdNotes`    | dateTime, content, tags[], userId, createdAt                                                                                                                             | Avaliação AH/SD            |
 | `kanbanTasks`  | title, description, status, priority, effort, deadline, labels[], context, checklist[], comments[], recurrence, recurrenceGeneratedAt, completedAt, userId, createdAt | Demandas de Trabalho & BI  |
 | `projects`     | title, category, priority, status, start, deadline, description, nextSteps, nextAction, hoursEstimated, hoursSpent, risks[], checklist[], usefulLinks[], dependencyProjectIds[], progress, progressLog[], completedAt, userId, createdAt | Projetos & Planos          |
@@ -121,7 +121,7 @@ Todas as coleções são criadas automaticamente pelo Firestore na primeira grav
 - O editor do Diário aceita uma sintaxe leve de Markdown: `# título`, `**negrito**`, `*itálico*` e listas com `- item`.
 - Todas as consultas ao Firestore filtram apenas por `userId` (sem `orderBy` composto), e a ordenação final é feita no navegador — isso evita a necessidade de criar índices compostos manualmente no console do Firebase.
 
-## Roadmap — "Life OS" (Fases 1 a 5 concluídas)
+## Roadmap — "Life OS" (Fases 1 a 6 concluídas)
 
 O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos implementando por fases, para não comprometer a qualidade numa única entrega.
 
@@ -161,9 +161,15 @@ O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos impl
 - ✅ Recorrência semanal ou mensal, criando automaticamente a próxima demanda ao concluir a atual.
 - ✅ Carga de esforço e demandas atrasadas integradas à tela de Insights.
 
+**Fase 6 — Diário contextual:**
+
+- ✅ Humor, energia, sono, local e clima em cada anotação.
+- ✅ Editor Markdown ampliado com prévia ao vivo e templates de escrita.
+- ✅ Favoritos, registros fixados e vínculos com projetos, metas e hábitos.
+- ✅ Médias de energia e sono e humor mais frequente integrados aos Insights.
+
 **Ainda não implementado** (próximas fases):
 
-- Campos de contexto no **Diário** (humor, energia, sono, local, clima) e editor Markdown completo
 - Evolução de **Ideias Literárias** (status, tipo, vínculos com personagens/livros/universos)
 - Evolução de **Aniversários** para cadastro completo de **Pessoas** (foto, contato, redes sociais, histórico)
 - Mapa de calor de produtividade e gráficos semanais/mensais mais amplos no Dashboard

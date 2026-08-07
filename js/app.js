@@ -49,7 +49,8 @@ function mdToHtml(raw = "") {
       continue;
     } else if (inList) { html += "</ul>"; inList = false; }
 
-    if (/^###\s+/.test(line)) html += `<h3>${line.replace(/^###\s+/, "")}</h3>`;
+    if (/^>\s+/.test(line)) html += `<blockquote>${line.replace(/^>\s+/, "")}</blockquote>`;
+    else if (/^###\s+/.test(line)) html += `<h3>${line.replace(/^###\s+/, "")}</h3>`;
     else if (/^##\s+/.test(line)) html += `<h2>${line.replace(/^##\s+/, "")}</h2>`;
     else if (/^#\s+/.test(line)) html += `<h1>${line.replace(/^#\s+/, "")}</h1>`;
     else if (line.trim() === "") html += "<br>";
@@ -58,7 +59,9 @@ function mdToHtml(raw = "") {
   if (inList) html += "</ul>";
   return html
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>");
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, `<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>`);
 }
 
 function fmtDate(d) {
@@ -240,6 +243,17 @@ const diaryAttachmentsFile = $("#diario-attachments-file");
 const diaryAttachmentsStatus = $("#diario-attachments-status");
 const diaryAttachmentsList = $("#diario-attachments-list");
 let diaryAttachmentsDraft = []; // [{url, name, format, resourceType, bytes}]
+let diaryLinkedProjects = [], diaryLinkedGoals = [], diaryLinkedHabits = [];
+
+function renderDiaryLinks() {
+  const groups = [["#diario-link-projects", projectItems || [], diaryLinkedProjects], ["#diario-link-goals", goalItems || [], diaryLinkedGoals], ["#diario-link-habits", habitItems || [], diaryLinkedHabits]];
+  groups.forEach(([selector, items, selected]) => { $(selector).innerHTML = items.length ? items.map((item) => `<button type="button" class="tag-toggle ${selected.includes(item.id) ? "active" : ""}" data-id="${item.id}">${item.emoji ? `${escapeHtml(item.emoji)} ` : ""}${escapeHtml(item.title)}</button>`).join("") : `<span class="project-editor-empty">Nenhum item disponível.</span>`; });
+}
+[["#diario-link-projects", "project"], ["#diario-link-goals", "goal"], ["#diario-link-habits", "habit"]].forEach(([selector, type]) => $(selector).addEventListener("click", (event) => { const btn = event.target.closest(".tag-toggle"); if (!btn) return; const key = type === "project" ? diaryLinkedProjects : type === "goal" ? diaryLinkedGoals : diaryLinkedHabits; const next = key.includes(btn.dataset.id) ? key.filter((id) => id !== btn.dataset.id) : [...key, btn.dataset.id]; if (type === "project") diaryLinkedProjects = next; else if (type === "goal") diaryLinkedGoals = next; else diaryLinkedHabits = next; renderDiaryLinks(); }));
+
+const DIARY_TEMPLATES = { daily: "# Reflexão do dia\n\n## O que aconteceu\n\n## Como me senti\n\n## Aprendizado\n\n## Próxima intenção\n", idea: "# Ideia\n\n## Essência\n\n## Por que importa\n\n## Possibilidades\n\n- Próximo passo\n", review: "# Revisão semanal\n\n## Conquistas\n\n- \n\n## Desafios\n\n## O que aprendi\n\n## Foco da próxima semana\n" };
+$("#diario-template").addEventListener("change", (event) => { if (!event.target.value) return; if (!$("#diario-content").value || confirm("Substituir o conteúdo atual pelo template?")) { $("#diario-content").value = DIARY_TEMPLATES[event.target.value]; $("#diario-content").dispatchEvent(new Event("input")); } event.target.value = ""; });
+$("#diario-content").addEventListener("input", () => { $("#diario-preview").innerHTML = mdToHtml($("#diario-content").value); });
 
 function fileIconSvg() {
   return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/></svg>`;
@@ -297,6 +311,8 @@ $("#diario-new-btn").addEventListener("click", () => {
   $("#diario-category").value = "Ideia Solta";
   $("#diario-tags").value = "";
   $("#diario-content").value = "";
+  $("#diario-mood").value = ""; $("#diario-energy").value = 3; $("#diario-sleep").value = ""; $("#diario-location").value = ""; $("#diario-weather").value = ""; $("#diario-favorite").checked = false; $("#diario-pinned").checked = false;
+  diaryLinkedProjects = []; diaryLinkedGoals = []; diaryLinkedHabits = []; renderDiaryLinks(); $("#diario-preview").innerHTML = "";
   diaryAttachmentsDraft = [];
   diaryAttachmentsStatus.textContent = "";
   renderAttachmentsDraft();
@@ -317,6 +333,8 @@ $("#diario-save-btn").addEventListener("click", async () => {
     status: $("#diario-status").value,
     tags,
     attachments: diaryAttachmentsDraft,
+    mood: $("#diario-mood").value || null, energy: Number($("#diario-energy").value), sleepHours: Number($("#diario-sleep").value) || null, location: $("#diario-location").value.trim(), weather: $("#diario-weather").value.trim(), favorite: $("#diario-favorite").checked, pinned: $("#diario-pinned").checked,
+    linkedProjectIds: diaryLinkedProjects, linkedGoalIds: diaryLinkedGoals, linkedHabitIds: diaryLinkedHabits,
   };
   const editId = $("#diario-edit-id").value;
   try {
@@ -345,6 +363,8 @@ function openDiaryEntry(id) {
   $("#diario-category").value = item.category;
   $("#diario-tags").value = (item.tags || []).join(", ");
   $("#diario-content").value = item.content;
+  $("#diario-mood").value = item.mood || ""; $("#diario-energy").value = item.energy ?? 3; $("#diario-sleep").value = item.sleepHours || ""; $("#diario-location").value = item.location || ""; $("#diario-weather").value = item.weather || ""; $("#diario-favorite").checked = Boolean(item.favorite); $("#diario-pinned").checked = Boolean(item.pinned);
+  diaryLinkedProjects = [...(item.linkedProjectIds || [])]; diaryLinkedGoals = [...(item.linkedGoalIds || [])]; diaryLinkedHabits = [...(item.linkedHabitIds || [])]; renderDiaryLinks(); $("#diario-preview").innerHTML = mdToHtml(item.content);
   diaryAttachmentsDraft = [...(item.attachments || [])];
   diaryAttachmentsStatus.textContent = "";
   renderAttachmentsDraft();
@@ -365,26 +385,31 @@ function renderDiary(items) {
       i.content.toLowerCase().includes(search) ||
       (i.tags || []).some((t) => t.toLowerCase().includes(search)) ||
       (i.book || "").toLowerCase().includes(search))
-    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
   $("#diario-empty").classList.toggle("hidden", filtered.length > 0);
   $("#diario-list").innerHTML = filtered.map((item) => {
     const atts = item.attachments || [];
     const images = atts.filter((a) => a.resourceType === "image");
     const files = atts.filter((a) => a.resourceType !== "image");
+    const diaryRelations = [...(item.linkedProjectIds || []).map((id) => ({ type: "project", item: projectItems.find((entry) => entry.id === id) })), ...(item.linkedGoalIds || []).map((id) => ({ type: "goal", item: goalItems.find((entry) => entry.id === id) })), ...(item.linkedHabitIds || []).map((id) => ({ type: "habit", item: habitItems.find((entry) => entry.id === id) }))].filter((relation) => relation.item);
     return `
     <article class="entry-card">
       <div class="entry-card-top">
         <span class="entry-tag" style="background:var(--amber-soft); color:var(--amber);">${escapeHtml(item.category)}</span>
         <span class="badge badge-status">${escapeHtml(item.status || "Rascunho")}</span>
+        ${item.pinned ? `<span title="Fixado">📌</span>` : ""}${item.favorite ? `<span title="Favorito">★</span>` : ""}
       </div>
       <h3 class="entry-title">${escapeHtml(item.title)}</h3>
       ${item.book ? `<p class="entry-meta"><span>📖 ${escapeHtml(item.book)}</span></p>` : ""}
+      ${(item.mood || item.energy != null || item.sleepHours || item.location || item.weather) ? `<div class="diary-context-chips">${item.mood ? `<span>☺ ${escapeHtml(item.mood)}</span>` : ""}${item.energy != null ? `<span>⚡ ${item.energy}/5</span>` : ""}${item.sleepHours ? `<span>☾ ${item.sleepHours}h</span>` : ""}${item.location ? `<span>⌖ ${escapeHtml(item.location)}</span>` : ""}${item.weather ? `<span>☁ ${escapeHtml(item.weather)}</span>` : ""}</div>` : ""}
       <div class="entry-body">${mdToHtml(item.content)}</div>
       ${images.length ? `<div class="entry-gallery">${images.map((img) => `<a href="${img.url}" target="_blank" rel="noopener"><img src="${img.url}" alt="${escapeHtml(img.name)}" loading="lazy"></a>`).join("")}</div>` : ""}
       ${files.length ? `<div class="entry-files">${files.map((f) => `<a class="entry-file-chip" href="${f.url}" target="_blank" rel="noopener">${fileIconSvg()} ${escapeHtml(f.name)}</a>`).join("")}</div>` : ""}
       ${(item.tags || []).length ? `<div class="entry-tags">${item.tags.map((t) => `<span class="tag-chip">#${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+      ${diaryRelations.length ? `<div class="linked-chips">${diaryRelations.map((relation) => `<button class="linked-chip" data-action="open-link" data-type="${relation.type}" data-id="${relation.item.id}">${escapeHtml(relation.item.emoji || "↗")} ${escapeHtml(relation.item.title)}</button>`).join("")}</div>` : ""}
       <div class="entry-actions">
+        <button data-action="favorite" data-id="${item.id}">${item.favorite ? "Desfavoritar" : "Favoritar"}</button><button data-action="pin" data-id="${item.id}">${item.pinned ? "Desafixar" : "Fixar"}</button>
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
       </div>
@@ -393,6 +418,9 @@ function renderDiary(items) {
   }).join("");
 
   $$('#diario-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openDiaryEntry(btn.dataset.id)));
+  $$('#diario-list [data-action="favorite"]').forEach((btn) => btn.addEventListener("click", () => { const item = diaryItems.find((entry) => entry.id === btn.dataset.id); diaryApi.update(item.id, { favorite: !item.favorite }); }));
+  $$('#diario-list [data-action="pin"]').forEach((btn) => btn.addEventListener("click", () => { const item = diaryItems.find((entry) => entry.id === btn.dataset.id); diaryApi.update(item.id, { pinned: !item.pinned }); }));
+  $$('#diario-list [data-action="open-link"]').forEach((btn) => btn.addEventListener("click", () => { if (btn.dataset.type === "project") openProjectEntry(btn.dataset.id); else if (btn.dataset.type === "goal") openGoalEntry(btn.dataset.id); else openHabitEntry(btn.dataset.id); }));
   $$('#diario-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir esta anotação?")) { diaryApi.remove(btn.dataset.id); showToast("Anotação excluída."); }
   }));
@@ -1874,12 +1902,20 @@ function renderInsights() {
   const openInsightTasks = kanbanItems.filter((task) => task.status !== "done");
   const openEffort = openInsightTasks.reduce((sum, task) => sum + (Number(task.effort) || 3), 0);
   const overdueTasks = openInsightTasks.filter((task) => task.deadline && task.deadline < now.toISOString().slice(0, 10)).length;
+  const contextualEntries = diaryItems.filter((entry) => inPeriod(entry.createdAt) && (entry.energy != null || entry.sleepHours || entry.mood));
+  const energyEntries = contextualEntries.filter((entry) => entry.energy != null);
+  const avgEnergy = energyEntries.length ? (energyEntries.reduce((sum, entry) => sum + Number(entry.energy), 0) / energyEntries.length).toFixed(1) : null;
+  const sleepEntries = contextualEntries.filter((entry) => entry.sleepHours);
+  const avgSleep = sleepEntries.length ? (sleepEntries.reduce((sum, entry) => sum + Number(entry.sleepHours), 0) / sleepEntries.length).toFixed(1) : null;
+  const moodCounts = contextualEntries.reduce((counts, entry) => { if (entry.mood) counts[entry.mood] = (counts[entry.mood] || 0) + 1; return counts; }, {});
+  const frequentMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
   $("#insights-summary").innerHTML = `
     <div class="insight-summary-item"><span class="insight-summary-emoji">✓</span><strong>${completionRate}% de conversão</strong><br>${completedInPeriod.length} conclusão(ões) para ${createdCount} novo(s) item(ns) no período.</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">↻</span>${bestHabit ? `<strong>${escapeHtml(bestHabit.title)}</strong><br>É seu hábito mais consistente, com ${bestHabit.score}% de aderência.` : "Cadastre hábitos para descobrir seu ritmo mais consistente."}</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">◎</span>${avgGoalProgress === null ? "Cadastre metas para acompanhar sua evolução." : `<strong>${avgGoalProgress}% de progresso médio</strong><br>em ${activeGoals.length} meta(s) ainda ativa(s).`}</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">▣</span>${activeInsightProjects.length ? `<strong>${projectsAtRisk.length} projeto(s) em atenção</strong><br>${projectsWithoutAction} sem próxima ação definida.` : "Cadastre projetos para acompanhar riscos e execução."}</div>
-    <div class="insight-summary-item"><span class="insight-summary-emoji">▤</span><strong>${openEffort} pontos em aberto</strong><br>${overdueTasks} demanda(s) atrasada(s) em ${openInsightTasks.length} ativa(s).</div>`;
+    <div class="insight-summary-item"><span class="insight-summary-emoji">▤</span><strong>${openEffort} pontos em aberto</strong><br>${overdueTasks} demanda(s) atrasada(s) em ${openInsightTasks.length} ativa(s).</div>
+    <div class="insight-summary-item"><span class="insight-summary-emoji">☀</span>${contextualEntries.length ? `<strong>Energia média ${avgEnergy || "—"}/5</strong><br>${avgSleep ? `${avgSleep}h de sono · ` : ""}${frequentMood ? `humor mais frequente: ${escapeHtml(frequentMood)}.` : `${contextualEntries.length} registro(s) contextual(is).`}` : "Registre humor, energia e sono no Diário para revelar padrões pessoais."}</div>`;
 }
 
 $("#insights-period").addEventListener("change", renderInsights);

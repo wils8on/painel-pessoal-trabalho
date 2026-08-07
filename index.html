@@ -252,6 +252,14 @@
           </select>
           <input type="text" id="diario-tags" class="input" placeholder="Tags separadas por vírgula (ex: mistério, capítulo 3)" />
         </div>
+        <div class="form-row form-row-3 diary-context-row">
+          <select id="diario-mood" class="input select"><option value="">Humor</option><option>Ótimo</option><option>Bem</option><option>Neutro</option><option>Cansado</option><option>Difícil</option></select>
+          <label class="field-label">Energia <input type="range" id="diario-energy" min="0" max="5" value="3" class="range" /></label>
+          <label class="field-label">Sono (horas)<input type="number" id="diario-sleep" min="0" max="24" step="0.5" class="input mono" /></label>
+        </div>
+        <div class="form-row form-row-2"><input type="text" id="diario-location" class="input" placeholder="Local (opcional)" /><input type="text" id="diario-weather" class="input" placeholder="Clima (opcional)" /></div>
+        <div class="form-row form-row-3"><select id="diario-template" class="input select"><option value="">Usar template…</option><option value="daily">Reflexão diária</option><option value="idea">Captura de ideia</option><option value="review">Revisão semanal</option></select><label class="diary-flag"><input type="checkbox" id="diario-favorite" /> Favorito</label><label class="diary-flag"><input type="checkbox" id="diario-pinned" /> Fixado</label></div>
+        <div class="project-form-section"><div class="project-form-section-head"><div><strong>Vínculos</strong><span>Relacione esta anotação ao que está em andamento.</span></div></div><p class="tag-toggle-group-label">Projetos</p><div id="diario-link-projects" class="tag-toggle-group"></div><p class="tag-toggle-group-label">Metas</p><div id="diario-link-goals" class="tag-toggle-group"></div><p class="tag-toggle-group-label">Hábitos</p><div id="diario-link-habits" class="tag-toggle-group"></div></div>
 
         <div class="attachments-field">
           <input type="hidden" id="diario-attachments-data" value="[]" />
@@ -264,7 +272,7 @@
           <div class="attachments-list" id="diario-attachments-list"></div>
         </div>
 
-        <textarea id="diario-content" class="input textarea" rows="10" placeholder="Escreva aqui… suporta **negrito**, *itálico*, # Título e listas com -"></textarea>
+        <div class="diary-editor-grid"><div><div class="diary-editor-label">Markdown</div><textarea id="diario-content" class="input textarea" rows="14" placeholder="Escreva aqui…"></textarea></div><div><div class="diary-editor-label">Prévia</div><div id="diario-preview" class="diary-preview entry-body"></div></div></div>
         <div class="form-actions">
           <button class="btn btn-ghost" id="diario-cancel-btn">Cancelar</button>
           <button class="btn btn-primary" data-accent="amber" id="diario-save-btn">Salvar</button>

@@ -527,6 +527,8 @@ html[data-theme="light"] .icon-moon { display: block; }
 .entry-title { font-family: var(--font-display); font-weight: 600; font-size: 1.02rem; margin: 0; }
 .entry-body { font-size: 0.85rem; line-height: 1.55; color: var(--ink-muted); max-height: 6.5em; overflow: hidden; }
 .entry-body h1, .entry-body h2, .entry-body h3 { font-family: var(--font-display); color: var(--ink); margin: 0.4em 0 0.2em; }
+.entry-body blockquote { margin: 0.5rem 0; padding: 0.35rem 0.7rem; border-left: 3px solid var(--amber); background: var(--amber-soft); }.entry-body code { font-family: var(--font-mono); background: var(--surface-strong); padding: 0.1rem 0.3rem; border-radius: 4px; }.entry-body a { color: var(--primary-2); }
+.diary-editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }.diary-editor-label { color: var(--ink-faint); font: 0.68rem var(--font-mono); text-transform: uppercase; margin-bottom: 0.35rem; }.diary-preview { min-height: 320px; max-height: 430px; overflow: auto; padding: 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-strong); }.diary-flag { display: flex; align-items: center; justify-content: center; gap: 0.4rem; color: var(--ink-muted); font-size: 0.8rem; }.diary-flag input { accent-color: var(--amber); }.diary-context-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }.diary-context-chips span { font: 0.66rem var(--font-mono); color: var(--amber); background: var(--amber-soft); padding: 0.18rem 0.5rem; border-radius: 20px; }
 .entry-meta { font-size: 0.76rem; color: var(--ink-faint); font-family: var(--font-mono); display: flex; gap: 0.7rem; flex-wrap: wrap; }
 .entry-actions { display: flex; gap: 0.6rem; margin-top: auto; padding-top: 0.4rem; }
 .entry-actions button {
@@ -826,6 +828,7 @@ html[data-theme="light"] .icon-moon { display: block; }
   .cal-day { height: 34px; font-size: 0.7rem; }
   .dash-hero { flex-direction: column; }
   .form-row-2, .form-row-3 { grid-template-columns: 1fr; }
+  .diary-editor-grid { grid-template-columns: 1fr; }
   .project-link-editor-row { grid-template-columns: 1fr 28px; }
   .project-link-editor-row input[data-field="url"] { grid-column: 1 / -1; grid-row: 2; }
   .insights-kpis { grid-template-columns: repeat(2, 1fr); }
