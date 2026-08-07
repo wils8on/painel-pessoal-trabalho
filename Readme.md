@@ -121,7 +121,7 @@ Todas as coleções são criadas automaticamente pelo Firestore na primeira grav
 - O editor do Diário aceita uma sintaxe leve de Markdown: `# título`, `**negrito**`, `*itálico*` e listas com `- item`.
 - Todas as consultas ao Firestore filtram apenas por `userId` (sem `orderBy` composto), e a ordenação final é feita no navegador — isso evita a necessidade de criar índices compostos manualmente no console do Firebase.
 
-## Roadmap — "Life OS" (Fases 1 a 8 concluídas)
+## Roadmap — "Life OS" (Fases 1 a 9 concluídas)
 
 O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos implementando por fases, para não comprometer a qualidade numa única entrega.
 
@@ -184,9 +184,16 @@ O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos impl
 - ✅ Vínculos com projetos e demandas e alertas de contato pendente.
 - ✅ Indicadores de relacionamento integrados aos Insights.
 
+**Fase 9 — Produtividade avançada:**
+
+- ✅ Mapa de calor geral e pontuação semanal de produtividade.
+- ✅ Comparação entre períodos e ritmo por dia da semana.
+- ✅ Correlação entre energia e atividade, alertas de carga e baixa atividade.
+- ✅ Resumo automático dos últimos sete dias e widget configurável no Dashboard.
+- ✅ Exportação consolidada dos indicadores em CSV.
+
 **Ainda não implementado** (próximas fases):
 
-- Mapa de calor de produtividade e gráficos semanais/mensais mais amplos no Dashboard
 - Melhorias de UX mais amplas (drag-and-drop generalizado, skeleton loading, menus de contexto, atalhos adicionais)
 
 Cada uma dessas frentes pode ser pedida como uma próxima fase separada.

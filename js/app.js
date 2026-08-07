@@ -1854,6 +1854,13 @@ function renderInsights() {
     ...goalItems.filter((item) => item.status === "Concluida" || Number(item.progress) >= 100),
   ];
   const completedInPeriod = completed.filter((item) => inPeriod(completionDate(item)));
+  const productivityEvents = [
+    ...createdCollections.map((item) => ({ date: insightDate(item.createdAt), kind: "criado", weight: 1 })),
+    ...completed.map((item) => ({ date: completionDate(item), kind: "concluído", weight: 2 })),
+    ...habitItems.flatMap((habit) => (habit.completions || []).map((date) => ({ date: new Date(date + "T12:00:00"), kind: "hábito", weight: 1 }))),
+  ].filter((event) => event.date);
+  const dayKey = (date) => { const parsed = insightDate(date); return parsed ? `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,"0")}-${String(parsed.getDate()).padStart(2,"0")}` : ""; };
+  const dayScores = productivityEvents.reduce((scores, event) => { const key = dayKey(event.date); scores[key] = (scores[key] || 0) + event.weight; return scores; }, {});
 
   const completionDurations = completedInPeriod.map((item) => {
     const created = insightDate(item.createdAt);
@@ -1931,6 +1938,20 @@ function renderInsights() {
     <div class="insight-rank-row"><span class="insight-rank-name" title="${escapeHtml(goal.title)}">${escapeHtml(goal.title)}</span><span class="insight-rank-track"><span class="insight-rank-fill goal" style="width:${Number(goal.progress) || 0}%"></span></span><span class="insight-rank-value">${Number(goal.progress) || 0}%</span></div>`).join("")
     : `<div class="insights-empty">Cadastre metas para visualizar sua evolução.</div>`;
 
+  const heatDays = Array.from({ length: 112 }, (_, index) => { const date = new Date(now); date.setHours(12,0,0,0); date.setDate(date.getDate() - (111-index)); return { date, score: dayScores[dayKey(date)] || 0 }; });
+  const maxDayScore = Math.max(1, ...heatDays.map((day) => day.score));
+  $("#productivity-heatmap").innerHTML = heatDays.map((day) => `<span class="productivity-cell level-${day.score ? Math.max(1, Math.ceil(day.score/maxDayScore*4)) : 0}" title="${fmtDate(day.date)} · ${day.score} ponto(s)"></span>`).join("");
+  const last7Score = heatDays.slice(-7).reduce((sum, day) => sum + day.score, 0); $("#productivity-score").textContent = `Score semanal ${Math.min(100, last7Score * 5)}/100`;
+  $("#dash-productivity-heatmap").innerHTML=$("#productivity-heatmap").innerHTML; $("#dash-productivity-caption").textContent=`Score semanal ${Math.min(100,last7Score*5)}/100 · ${heatDays.slice(-7).filter((day)=>day.score).length}/7 dias ativos`; const widgetVisible=localStorage.getItem("nova-productivity-widget")!=="hidden"; $("#dash-productivity-widget").classList.toggle("hidden",!widgetVisible); $("#productivity-widget-toggle").textContent=widgetVisible?"Ocultar widget do Dashboard":"Mostrar widget no Dashboard";
+  const weekdays = Array.from({length:7},(_,day)=>({day,count:0})); productivityEvents.filter((event)=>inPeriod(event.date)).forEach((event)=>weekdays[event.date.getDay()].count += event.weight); const maxWeekday=Math.max(1,...weekdays.map((item)=>item.count)); const weekdayNames=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+  $("#weekday-productivity").innerHTML=weekdays.map((item)=>`<div><span class="weekday-bar"><i style="height:${item.count/maxWeekday*100}%"></i></span><b>${weekdayNames[item.day]}</b><small>${item.count}</small></div>`).join("");
+  const rangeDays = periodValue === "all" ? 365 : Number(periodValue); const previousStart = new Date(now.getTime()-rangeDays*2*86400000); const currentStart = new Date(now.getTime()-rangeDays*86400000); const currentEvents=productivityEvents.filter((event)=>event.date>=currentStart).reduce((sum,event)=>sum+event.weight,0); const previousEvents=productivityEvents.filter((event)=>event.date>=previousStart&&event.date<currentStart).reduce((sum,event)=>sum+event.weight,0); const variation=previousEvents?Math.round((currentEvents-previousEvents)/previousEvents*100):(currentEvents?100:0);
+  $("#period-comparison").innerHTML=`<strong class="comparison-value ${variation>=0?"up":"down"}">${variation>=0?"+":""}${variation}%</strong><p>${currentEvents} pontos agora contra ${previousEvents} no período anterior.</p>`;
+  const productivityContextEntries=diaryItems.filter((entry)=>inPeriod(entry.createdAt)&&(entry.energy!=null||entry.sleepHours)); const activityForDiary=(entry)=>dayScores[dayKey(entry.createdAt)]||0; const highEnergy=productivityContextEntries.filter((entry)=>Number(entry.energy)>=4); const lowEnergy=productivityContextEntries.filter((entry)=>Number(entry.energy)<=2); const avgActivity=(entries)=>entries.length?(entries.reduce((sum,entry)=>sum+activityForDiary(entry),0)/entries.length).toFixed(1):null; const highActivity=avgActivity(highEnergy), lowActivity=avgActivity(lowEnergy);
+  $("#context-correlation").innerHTML=productivityContextEntries.length?`<div class="correlation-row"><span>Energia alta</span><strong>${highActivity||"—"} pts/dia</strong></div><div class="correlation-row"><span>Energia baixa</span><strong>${lowActivity||"—"} pts/dia</strong></div><p>${highActivity&&lowActivity?(Number(highActivity)>=Number(lowActivity)?"Seus dias de energia alta concentram mais atividade.":"Sua atividade não depende apenas da energia registrada."):"Continue registrando contexto para melhorar a comparação."}</p>`:`<div class="insights-empty">Registre energia no Diário para calcular correlações.</div>`;
+  const weekCreated=createdCollections.filter((item)=>{const date=insightDate(item.createdAt);return date&&date>=new Date(now.getTime()-7*86400000);}).length; const weekCompleted=completed.filter((item)=>{const date=completionDate(item);return date&&date>=new Date(now.getTime()-7*86400000);}).length; const activeDays=heatDays.slice(-7).filter((day)=>day.score>0).length;
+  const currentOpenEffort=kanbanItems.filter((task)=>task.status!=="done").reduce((sum,task)=>sum+(Number(task.effort)||3),0); $("#weekly-summary").innerHTML=`<strong>${activeDays}/7 dias ativos</strong><p>${weekCreated} item(ns) criado(s), ${weekCompleted} conclusão(ões) e ${last7Score} pontos de produtividade.</p>${activeDays<=2?`<span class="productivity-alert">Ritmo baixo: escolha uma próxima ação pequena.</span>`:currentOpenEffort>40?`<span class="productivity-alert">Carga alta: ${currentOpenEffort} pontos em demandas abertas.</span>`:`<span class="productivity-good">Ritmo sustentável nesta semana.</span>`}`;
+
   const completionRate = createdCount ? Math.round(completedInPeriod.length / createdCount * 100) : 0;
   const bestHabit = habitScores[0];
   const activeGoals = goalItems.filter((goal) => goal.status !== "Concluida");
@@ -1962,6 +1983,8 @@ function renderInsights() {
 }
 
 $("#insights-period").addEventListener("change", renderInsights);
+$("#productivity-widget-toggle").addEventListener("click",()=>{ const visible=$("#dash-productivity-widget").classList.contains("hidden"); localStorage.setItem("nova-productivity-widget",visible?"visible":"hidden"); renderInsights(); });
+$("#insights-export").addEventListener("click", () => { const rows=[["modulo","titulo","status","progresso","criado_em","concluido_em"],...diaryItems.map((item)=>["diario",item.title,item.status||"","",insightDate(item.createdAt)?.toISOString()||"",""]),...kanbanItems.map((item)=>["demandas",item.title,item.status||"",item.effort||"",insightDate(item.createdAt)?.toISOString()||"",completionDate(item)?.toISOString()||""]),...projectItems.map((item)=>["projetos",item.title,item.status||"",item.progress||0,insightDate(item.createdAt)?.toISOString()||"",item.status==="Concluido"?completionDate(item)?.toISOString()||"":""]),...goalItems.map((item)=>["metas",item.title,item.status||"",item.progress||0,insightDate(item.createdAt)?.toISOString()||"",item.status==="Concluida"?completionDate(item)?.toISOString()||"":""])]; const csv=rows.map((row)=>row.map((value)=>`"${String(value??"").replace(/"/g,`""`)}"`).join(",")).join("\n"); const url=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"})); const link=document.createElement("a"); link.href=url; link.download=`nova-insights-${new Date().toISOString().slice(0,10)}.csv`; link.click(); URL.revokeObjectURL(url); showToast("CSV exportado."); });
 
 /* =========================================================
    ATIVIDADE GERAL — feed cronológico reutilizável (Dashboard + view própria)

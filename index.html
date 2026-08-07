@@ -199,6 +199,7 @@
           <div id="dash-activity-list" class="activity-list"></div>
           <p class="empty-state small" id="dash-activity-empty">Assim que você começar a usar o Nova, as novidades aparecem aqui.</p>
         </div>
+        <div class="glass-card dash-card dash-card-span2" id="dash-productivity-widget"><div class="glass-card-head"><h3>Produtividade · 16 semanas</h3></div><div id="dash-productivity-heatmap" class="productivity-heatmap"></div><p id="dash-productivity-caption" class="ring-caption"></p></div>
       </div>
     </section>
 
@@ -689,6 +690,8 @@
             <option value="all">Todo o período</option>
           </select>
         </label>
+        <button class="btn btn-ghost" id="insights-export">Exportar CSV</button>
+        <button class="btn btn-ghost" id="productivity-widget-toggle">Ocultar widget do Dashboard</button>
       </header>
 
       <div class="insights-kpis" id="insights-kpis"></div>
@@ -710,6 +713,11 @@
           <div class="insights-card-head"><div><h3>Progresso das metas</h3><p>Metas com maior avanço</p></div></div>
           <div id="insights-goals" class="insights-ranked-list"></div>
         </article>
+        <article class="glass-card insights-card insights-card-wide"><div class="insights-card-head"><div><h3>Mapa de produtividade</h3><p>Atividade diária nas últimas 16 semanas</p></div><span id="productivity-score" class="productivity-score"></span></div><div id="productivity-heatmap" class="productivity-heatmap"></div></article>
+        <article class="glass-card insights-card"><div class="insights-card-head"><div><h3>Ritmo semanal</h3><p>Atividade por dia da semana</p></div></div><div id="weekday-productivity" class="weekday-chart"></div></article>
+        <article class="glass-card insights-card"><div class="insights-card-head"><div><h3>Comparação</h3><p>Período atual versus anterior</p></div></div><div id="period-comparison" class="period-comparison"></div></article>
+        <article class="glass-card insights-card"><div class="insights-card-head"><div><h3>Contexto e produtividade</h3><p>Energia e sono nos dias registrados</p></div></div><div id="context-correlation" class="context-correlation"></div></article>
+        <article class="glass-card insights-card"><div class="insights-card-head"><div><h3>Resumo semanal</h3><p>Últimos sete dias</p></div></div><div id="weekly-summary" class="weekly-summary"></div></article>
         <article class="glass-card insights-card insights-card-wide">
           <div class="insights-card-head"><div><h3>Leitura do período</h3><p>Destaques calculados a partir dos seus dados</p></div></div>
           <div id="insights-summary" class="insights-summary"></div>
