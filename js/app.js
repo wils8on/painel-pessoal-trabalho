@@ -244,12 +244,16 @@ const diaryAttachmentsStatus = $("#diario-attachments-status");
 const diaryAttachmentsList = $("#diario-attachments-list");
 let diaryAttachmentsDraft = []; // [{url, name, format, resourceType, bytes}]
 let diaryLinkedProjects = [], diaryLinkedGoals = [], diaryLinkedHabits = [];
+let diaryLiteraryLinks = [];
 
 function renderDiaryLinks() {
   const groups = [["#diario-link-projects", projectItems || [], diaryLinkedProjects], ["#diario-link-goals", goalItems || [], diaryLinkedGoals], ["#diario-link-habits", habitItems || [], diaryLinkedHabits]];
   groups.forEach(([selector, items, selected]) => { $(selector).innerHTML = items.length ? items.map((item) => `<button type="button" class="tag-toggle ${selected.includes(item.id) ? "active" : ""}" data-id="${item.id}">${item.emoji ? `${escapeHtml(item.emoji)} ` : ""}${escapeHtml(item.title)}</button>`).join("") : `<span class="project-editor-empty">Nenhum item disponível.</span>`; });
+  const editId = $("#diario-edit-id").value; const literary = diaryItems.filter((item) => item.id !== editId && item.category !== "Ideia Solta");
+  $("#diario-literary-links").innerHTML = literary.length ? literary.map((item) => `<button type="button" class="tag-toggle ${diaryLiteraryLinks.includes(item.id) ? "active" : ""}" data-id="${item.id}">${escapeHtml(item.title)}</button>`).join("") : `<span class="project-editor-empty">Nenhuma outra ideia literária.</span>`;
 }
 [["#diario-link-projects", "project"], ["#diario-link-goals", "goal"], ["#diario-link-habits", "habit"]].forEach(([selector, type]) => $(selector).addEventListener("click", (event) => { const btn = event.target.closest(".tag-toggle"); if (!btn) return; const key = type === "project" ? diaryLinkedProjects : type === "goal" ? diaryLinkedGoals : diaryLinkedHabits; const next = key.includes(btn.dataset.id) ? key.filter((id) => id !== btn.dataset.id) : [...key, btn.dataset.id]; if (type === "project") diaryLinkedProjects = next; else if (type === "goal") diaryLinkedGoals = next; else diaryLinkedHabits = next; renderDiaryLinks(); }));
+$("#diario-literary-links").addEventListener("click", (event) => { const btn = event.target.closest(".tag-toggle"); if (!btn) return; diaryLiteraryLinks = diaryLiteraryLinks.includes(btn.dataset.id) ? diaryLiteraryLinks.filter((id) => id !== btn.dataset.id) : [...diaryLiteraryLinks, btn.dataset.id]; renderDiaryLinks(); });
 
 const DIARY_TEMPLATES = { daily: "# Reflexão do dia\n\n## O que aconteceu\n\n## Como me senti\n\n## Aprendizado\n\n## Próxima intenção\n", idea: "# Ideia\n\n## Essência\n\n## Por que importa\n\n## Possibilidades\n\n- Próximo passo\n", review: "# Revisão semanal\n\n## Conquistas\n\n- \n\n## Desafios\n\n## O que aprendi\n\n## Foco da próxima semana\n" };
 $("#diario-template").addEventListener("change", (event) => { if (!event.target.value) return; if (!$("#diario-content").value || confirm("Substituir o conteúdo atual pelo template?")) { $("#diario-content").value = DIARY_TEMPLATES[event.target.value]; $("#diario-content").dispatchEvent(new Event("input")); } event.target.value = ""; });
@@ -313,6 +317,7 @@ $("#diario-new-btn").addEventListener("click", () => {
   $("#diario-content").value = "";
   $("#diario-mood").value = ""; $("#diario-energy").value = 3; $("#diario-sleep").value = ""; $("#diario-location").value = ""; $("#diario-weather").value = ""; $("#diario-favorite").checked = false; $("#diario-pinned").checked = false;
   diaryLinkedProjects = []; diaryLinkedGoals = []; diaryLinkedHabits = []; renderDiaryLinks(); $("#diario-preview").innerHTML = "";
+  diaryLiteraryLinks = []; $("#diario-universe").value = ""; $("#diario-maturity").value = ""; $("#diario-narrative-date").value = ""; $("#diario-role").value = ""; $("#diario-motivation").value = ""; $("#diario-conflict").value = ""; $("#diario-traits").value = ""; renderDiaryLinks();
   diaryAttachmentsDraft = [];
   diaryAttachmentsStatus.textContent = "";
   renderAttachmentsDraft();
@@ -335,6 +340,7 @@ $("#diario-save-btn").addEventListener("click", async () => {
     attachments: diaryAttachmentsDraft,
     mood: $("#diario-mood").value || null, energy: Number($("#diario-energy").value), sleepHours: Number($("#diario-sleep").value) || null, location: $("#diario-location").value.trim(), weather: $("#diario-weather").value.trim(), favorite: $("#diario-favorite").checked, pinned: $("#diario-pinned").checked,
     linkedProjectIds: diaryLinkedProjects, linkedGoalIds: diaryLinkedGoals, linkedHabitIds: diaryLinkedHabits,
+    universe: $("#diario-universe").value.trim(), maturity: $("#diario-maturity").value || null, narrativeDate: $("#diario-narrative-date").value.trim(), role: $("#diario-role").value.trim(), motivation: $("#diario-motivation").value.trim(), conflict: $("#diario-conflict").value.trim(), traits: $("#diario-traits").value.trim(), relatedLiteraryIds: diaryLiteraryLinks,
   };
   const editId = $("#diario-edit-id").value;
   try {
@@ -365,6 +371,7 @@ function openDiaryEntry(id) {
   $("#diario-content").value = item.content;
   $("#diario-mood").value = item.mood || ""; $("#diario-energy").value = item.energy ?? 3; $("#diario-sleep").value = item.sleepHours || ""; $("#diario-location").value = item.location || ""; $("#diario-weather").value = item.weather || ""; $("#diario-favorite").checked = Boolean(item.favorite); $("#diario-pinned").checked = Boolean(item.pinned);
   diaryLinkedProjects = [...(item.linkedProjectIds || [])]; diaryLinkedGoals = [...(item.linkedGoalIds || [])]; diaryLinkedHabits = [...(item.linkedHabitIds || [])]; renderDiaryLinks(); $("#diario-preview").innerHTML = mdToHtml(item.content);
+  diaryLiteraryLinks = [...(item.relatedLiteraryIds || [])]; $("#diario-universe").value = item.universe || ""; $("#diario-maturity").value = item.maturity || ""; $("#diario-narrative-date").value = item.narrativeDate || ""; $("#diario-role").value = item.role || ""; $("#diario-motivation").value = item.motivation || ""; $("#diario-conflict").value = item.conflict || ""; $("#diario-traits").value = item.traits || ""; renderDiaryLinks();
   diaryAttachmentsDraft = [...(item.attachments || [])];
   diaryAttachmentsStatus.textContent = "";
   renderAttachmentsDraft();
@@ -426,7 +433,24 @@ function renderDiary(items) {
   }));
 
   refreshDashboard();
+  renderLiterary();
 }
+
+const LITERARY_TYPES = ["Capítulo", "Cena", "Personagem", "Plot", "Trama", "Nota de Pesquisa", "Local", "Objeto"];
+function renderLiterary() {
+  if (!$("#literatura-list")) return;
+  const all = diaryItems.filter((item) => LITERARY_TYPES.includes(item.category));
+  const books = [...new Set(all.map((item) => item.book).filter(Boolean))].sort(); const bookSelect = $("#literatura-book"); const currentBook = bookSelect.value; bookSelect.innerHTML = `<option value="">Todas as obras</option>${books.map((book) => `<option>${escapeHtml(book)}</option>`).join("")}`; bookSelect.value = currentBook;
+  const search = $("#literatura-search").value.toLowerCase(), type = $("#literatura-type").value, book = bookSelect.value, maturity = $("#literatura-maturity").value;
+  const filtered = all.filter((item) => !search || `${item.title} ${item.content} ${item.universe || ""}`.toLowerCase().includes(search)).filter((item) => !type || item.category === type).filter((item) => !book || item.book === book).filter((item) => !maturity || item.maturity === maturity);
+  const counts = LITERARY_TYPES.map((typeName) => ({ type: typeName, count: all.filter((item) => item.category === typeName).length })).filter((entry) => entry.count);
+  $("#literatura-coverage").innerHTML = `<div class="literary-stat"><strong>${all.length}</strong><span>elementos</span></div><div class="literary-stat"><strong>${books.length}</strong><span>obras</span></div><div class="literary-stat"><strong>${all.filter((item) => item.maturity === "Pronta").length}</strong><span>ideias prontas</span></div>${counts.map((entry) => `<div class="literary-type-count"><span>${entry.type}</span><strong>${entry.count}</strong></div>`).join("")}`;
+  $("#literatura-empty").classList.toggle("hidden", filtered.length > 0);
+  $("#literatura-list").innerHTML = filtered.map((item) => { const relations = (item.relatedLiteraryIds || []).map((id) => diaryItems.find((entry) => entry.id === id)).filter(Boolean); return `<article class="entry-card literary-card" data-id="${item.id}"><div class="entry-card-top"><span class="entry-tag">${escapeHtml(item.category)}</span><span class="badge badge-status">${escapeHtml(item.maturity || "Semente")}</span></div><h3 class="entry-title">${escapeHtml(item.title)}</h3><p class="entry-meta">${item.book ? `<span>📖 ${escapeHtml(item.book)}</span>` : ""}${item.universe ? `<span>✦ ${escapeHtml(item.universe)}</span>` : ""}${item.narrativeDate ? `<span>◷ ${escapeHtml(item.narrativeDate)}</span>` : ""}</p>${item.role ? `<p class="entry-body"><strong>Papel:</strong> ${escapeHtml(item.role)}</p>` : ""}${item.motivation ? `<p class="entry-body"><strong>Motivação:</strong> ${escapeHtml(item.motivation)}</p>` : ""}${item.conflict ? `<p class="entry-body"><strong>Conflito:</strong> ${escapeHtml(item.conflict)}</p>` : ""}<div class="entry-body">${mdToHtml(item.content)}</div>${relations.length ? `<div class="linked-chips">${relations.map((relation) => `<button class="linked-chip" data-related-id="${relation.id}">↗ ${escapeHtml(relation.title)}</button>`).join("")}</div>` : ""}<div class="entry-actions"><button data-edit-id="${item.id}">Editar</button></div></article>`; }).join("");
+  $$("#literatura-list [data-edit-id]").forEach((btn) => btn.addEventListener("click", () => openDiaryEntry(btn.dataset.editId))); $$("#literatura-list [data-related-id]").forEach((btn) => btn.addEventListener("click", () => openDiaryEntry(btn.dataset.relatedId)));
+}
+$("#literatura-new-btn").addEventListener("click", () => { switchView("diario"); $("#diario-new-btn").click(); $("#diario-category").value = "Cena"; });
+[$("#literatura-search"), $("#literatura-type"), $("#literatura-book"), $("#literatura-maturity")].forEach((element) => element.addEventListener(element.tagName === "INPUT" ? "input" : "change", renderLiterary));
 
 /* =========================================================
    MÓDULO 2 — Avaliação AH/SD
@@ -1909,13 +1933,15 @@ function renderInsights() {
   const avgSleep = sleepEntries.length ? (sleepEntries.reduce((sum, entry) => sum + Number(entry.sleepHours), 0) / sleepEntries.length).toFixed(1) : null;
   const moodCounts = contextualEntries.reduce((counts, entry) => { if (entry.mood) counts[entry.mood] = (counts[entry.mood] || 0) + 1; return counts; }, {});
   const frequentMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const literaryItems = diaryItems.filter((entry) => ["Capítulo", "Cena", "Personagem", "Plot", "Trama", "Nota de Pesquisa", "Local", "Objeto"].includes(entry.category));
   $("#insights-summary").innerHTML = `
     <div class="insight-summary-item"><span class="insight-summary-emoji">✓</span><strong>${completionRate}% de conversão</strong><br>${completedInPeriod.length} conclusão(ões) para ${createdCount} novo(s) item(ns) no período.</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">↻</span>${bestHabit ? `<strong>${escapeHtml(bestHabit.title)}</strong><br>É seu hábito mais consistente, com ${bestHabit.score}% de aderência.` : "Cadastre hábitos para descobrir seu ritmo mais consistente."}</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">◎</span>${avgGoalProgress === null ? "Cadastre metas para acompanhar sua evolução." : `<strong>${avgGoalProgress}% de progresso médio</strong><br>em ${activeGoals.length} meta(s) ainda ativa(s).`}</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">▣</span>${activeInsightProjects.length ? `<strong>${projectsAtRisk.length} projeto(s) em atenção</strong><br>${projectsWithoutAction} sem próxima ação definida.` : "Cadastre projetos para acompanhar riscos e execução."}</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">▤</span><strong>${openEffort} pontos em aberto</strong><br>${overdueTasks} demanda(s) atrasada(s) em ${openInsightTasks.length} ativa(s).</div>
-    <div class="insight-summary-item"><span class="insight-summary-emoji">☀</span>${contextualEntries.length ? `<strong>Energia média ${avgEnergy || "—"}/5</strong><br>${avgSleep ? `${avgSleep}h de sono · ` : ""}${frequentMood ? `humor mais frequente: ${escapeHtml(frequentMood)}.` : `${contextualEntries.length} registro(s) contextual(is).`}` : "Registre humor, energia e sono no Diário para revelar padrões pessoais."}</div>`;
+    <div class="insight-summary-item"><span class="insight-summary-emoji">☀</span>${contextualEntries.length ? `<strong>Energia média ${avgEnergy || "—"}/5</strong><br>${avgSleep ? `${avgSleep}h de sono · ` : ""}${frequentMood ? `humor mais frequente: ${escapeHtml(frequentMood)}.` : `${contextualEntries.length} registro(s) contextual(is).`}` : "Registre humor, energia e sono no Diário para revelar padrões pessoais."}</div>
+    <div class="insight-summary-item"><span class="insight-summary-emoji">✦</span><strong>${literaryItems.length} elementos literários</strong><br>${literaryItems.filter((item) => item.maturity === "Pronta").length} ideia(s) pronta(s) em ${new Set(literaryItems.map((item) => item.book).filter(Boolean)).size} obra(s).</div>`;
 }
 
 $("#insights-period").addEventListener("change", renderInsights);

@@ -58,6 +58,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v18H6.5A2.5 2.5 0 0 1 4 18.5v-13Z"/><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H12v18h5.5a2.5 2.5 0 0 0 2.5-2.5v-13Z"/></svg>
       <span class="rail-label">Diário</span>
     </button>
+    <button class="rail-btn" data-view="literatura" data-accent="amber" title="Universo Literário" aria-label="Universo Literário"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M8 16h11M9 8h6M9 11h4"/></svg><span class="rail-label">Literatura</span></button>
     <button class="rail-btn" data-view="ahsd" data-accent="plum" title="Avaliação AH/SD" aria-label="Avaliação AH/SD">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8.5 11.5 10.5 13.5 15.5 9"/></svg>
       <span class="rail-label">AH/SD</span>
@@ -249,9 +250,11 @@
             <option value="Personagem">Personagem</option>
             <option value="Plot">Plot</option>
             <option value="Nota de Pesquisa">Nota de Pesquisa</option>
+            <option value="Local">Local</option><option value="Objeto">Objeto</option><option value="Trama">Trama</option>
           </select>
           <input type="text" id="diario-tags" class="input" placeholder="Tags separadas por vírgula (ex: mistério, capítulo 3)" />
         </div>
+        <div class="project-form-section"><div class="project-form-section-head"><div><strong>Desenvolvimento literário</strong><span>Opcional para diário pessoal.</span></div></div><div class="form-row form-row-3"><input id="diario-universe" class="input" placeholder="Série / universo"/><select id="diario-maturity" class="input select"><option value="">Maturidade da ideia</option><option value="Semente">Semente</option><option value="Explorando">Explorando</option><option value="Estruturada">Estruturada</option><option value="Pronta">Pronta</option></select><input id="diario-narrative-date" class="input" placeholder="Momento narrativo (ex: Dia 3)"/></div><div class="form-row form-row-3"><input id="diario-role" class="input" placeholder="Papel / arquétipo"/><input id="diario-motivation" class="input" placeholder="Motivação"/><input id="diario-conflict" class="input" placeholder="Conflito central"/></div><textarea id="diario-traits" class="input textarea" rows="2" placeholder="Traços, aparência ou notas de personagem"></textarea><p class="tag-toggle-group-label">Relações narrativas</p><div id="diario-literary-links" class="tag-toggle-group"></div></div>
         <div class="form-row form-row-3 diary-context-row">
           <select id="diario-mood" class="input select"><option value="">Humor</option><option>Ótimo</option><option>Bem</option><option>Neutro</option><option>Cansado</option><option>Difícil</option></select>
           <label class="field-label">Energia <input type="range" id="diario-energy" min="0" max="5" value="3" class="range" /></label>
@@ -282,6 +285,8 @@
       <div id="diario-list" class="card-grid"></div>
       <p class="empty-state" id="diario-empty">Nenhuma anotação ainda. Comece registrando uma ideia solta.</p>
     </section>
+
+    <section class="view" id="view-literatura" data-accent="amber"><header class="view-header"><div class="view-header-title"><span class="view-icon" data-accent="amber">✦</span><div><h2 class="view-title">Universo Literário</h2><p class="view-subtitle">Personagens, cenas, capítulos e tramas conectados.</p></div></div><button class="btn btn-primary" data-accent="amber" id="literatura-new-btn">+ Nova ideia</button></header><div id="literatura-coverage" class="literary-coverage"></div><div class="toolbar"><input type="search" id="literatura-search" class="input" placeholder="Buscar no universo…"/><select id="literatura-type" class="input select"><option value="">Todos os tipos</option><option>Personagem</option><option>Cena</option><option>Capítulo</option><option>Plot</option><option>Trama</option><option>Local</option><option>Objeto</option><option>Nota de Pesquisa</option></select><select id="literatura-book" class="input select"><option value="">Todas as obras</option></select><select id="literatura-maturity" class="input select"><option value="">Toda maturidade</option><option>Semente</option><option>Explorando</option><option>Estruturada</option><option>Pronta</option></select></div><div id="literatura-list" class="card-grid"></div><p id="literatura-empty" class="empty-state">Suas ideias literárias aparecerão aqui.</p></section>
 
     <!-- VIEW 2 — Avaliação AH/SD -->
     <section class="view" id="view-ahsd" data-accent="plum">
