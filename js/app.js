@@ -544,6 +544,8 @@ $("#kanban-new-btn").addEventListener("click", () => {
   $("#kanban-edit-id").value = "";
   $("#kanban-title").value = "";
   $("#kanban-desc").value = "";
+  $("#kanban-priority").value = "Media"; $("#kanban-effort").value = "3"; $("#kanban-deadline").value = "";
+  $("#kanban-labels").value = ""; $("#kanban-context").value = ""; $("#kanban-checklist").value = ""; $("#kanban-recurrence").value = "";
   kanbanForm.classList.remove("hidden");
 });
 $("#kanban-cancel-btn").addEventListener("click", () => kanbanForm.classList.add("hidden"));
@@ -551,8 +553,11 @@ $("#kanban-cancel-btn").addEventListener("click", () => kanbanForm.classList.add
 $("#kanban-save-btn").addEventListener("click", async () => {
   const title = $("#kanban-title").value.trim();
   if (!title) return showToast("Informe um título para a demanda.", "error");
-  const payload = { title, description: $("#kanban-desc").value.trim() };
   const editId = $("#kanban-edit-id").value;
+  const existing = editId ? kanbanItems.find((item) => item.id === editId) : null;
+  const oldChecklist = existing?.checklist || [];
+  const checklist = $("#kanban-checklist").value.split("\n").map((text) => text.trim()).filter(Boolean).map((text) => ({ id: oldChecklist.find((item) => item.text === text)?.id || projectDraftId(), text, done: oldChecklist.find((item) => item.text === text)?.done || false }));
+  const payload = { title, description: $("#kanban-desc").value.trim(), priority: $("#kanban-priority").value, effort: Number($("#kanban-effort").value), deadline: $("#kanban-deadline").value || null, labels: $("#kanban-labels").value.split(",").map((label) => label.trim()).filter(Boolean), context: $("#kanban-context").value.trim(), checklist, recurrence: $("#kanban-recurrence").value || null };
   try {
     if (editId) await kanbanApi.update(editId, payload);
     else await kanbanApi.add(currentUser.uid, { ...payload, status: "todo" });
@@ -571,22 +576,38 @@ function openKanbanTask(id) {
   $("#kanban-edit-id").value = item.id;
   $("#kanban-title").value = item.title;
   $("#kanban-desc").value = item.description || "";
+  $("#kanban-priority").value = item.priority || "Media"; $("#kanban-effort").value = item.effort || 3; $("#kanban-deadline").value = item.deadline || "";
+  $("#kanban-labels").value = (item.labels || []).join(", "); $("#kanban-context").value = item.context || ""; $("#kanban-checklist").value = (item.checklist || []).map((entry) => entry.text).join("\n"); $("#kanban-recurrence").value = item.recurrence || "";
   kanbanForm.classList.remove("hidden");
 }
 
 function renderKanban(items) {
   if (items) kanbanItems = items;
+  const search = $("#kanban-search").value.toLowerCase();
+  const priorityFilter = $("#kanban-filter-priority").value;
+  const labelFilter = $("#kanban-filter-label").value;
+  const labels = [...new Set(kanbanItems.flatMap((item) => item.labels || []))].sort();
+  const labelSelect = $("#kanban-filter-label"); const selectedLabel = labelSelect.value;
+  labelSelect.innerHTML = `<option value="">Todas as etiquetas</option>${labels.map((label) => `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`).join("")}`; labelSelect.value = selectedLabel;
   const cols = { todo: [], doing: [], done: [] };
   [...kanbanItems]
+    .filter((item) => !search || `${item.title} ${item.description || ""} ${(item.labels || []).join(" ")} ${item.context || ""}`.toLowerCase().includes(search))
+    .filter((item) => !priorityFilter || (item.priority || "Media") === priorityFilter)
+    .filter((item) => !labelFilter || (item.labels || []).includes(labelFilter))
     .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))
     .forEach((item) => cols[item.status || "todo"].push(item));
 
   ["todo", "doing", "done"].forEach((status) => {
     $(`#count-${status}`).textContent = cols[status].length;
     $(`#col-${status}`).innerHTML = cols[status].map((item) => `
-      <div class="kanban-card" draggable="true" data-id="${item.id}">
+      <div class="kanban-card priority-${(item.priority || "Media").toLowerCase()}" draggable="true" data-id="${item.id}">
+        <div class="kanban-card-badges"><span class="badge ${PRIORITY_BADGE[item.priority || "Media"]}">${PRIORITY_LABEL[item.priority || "Media"]}</span><span class="kanban-effort">${item.effort || 3} pt</span>${item.recurrence ? `<span class="kanban-recurring">↻ ${item.recurrence}</span>` : ""}</div>
         <p class="kanban-card-title">${escapeHtml(item.title)}</p>
         ${item.description ? `<p class="kanban-card-desc">${escapeHtml(item.description)}</p>` : ""}
+        ${(item.labels || []).length ? `<div class="kanban-labels">${item.labels.map((label) => `<span>${escapeHtml(label)}</span>`).join("")}</div>` : ""}
+        <div class="kanban-meta">${item.context ? `<span>◎ ${escapeHtml(item.context)}</span>` : ""}${item.deadline ? `<span class="${item.deadline < new Date().toISOString().slice(0,10) && item.status !== "done" ? "overdue" : ""}">◷ ${fmtDate(new Date(item.deadline + "T00:00:00"))}</span>` : ""}</div>
+        ${(item.checklist || []).length ? `<div class="kanban-checklist">${item.checklist.map((check) => `<label class="${check.done ? "done" : ""}"><input type="checkbox" data-action="check" data-id="${item.id}" data-check-id="${check.id}" ${check.done ? "checked" : ""}/><span>${escapeHtml(check.text)}</span></label>`).join("")}</div>` : ""}
+        <div class="kanban-comments">${(item.comments || []).slice(-2).map((comment) => `<p><strong>${escapeHtml(comment.author || "Você")}</strong> ${escapeHtml(comment.text)}</p>`).join("")}<div><input class="input" id="kanban-comment-${item.id}" placeholder="Adicionar comentário…"/><button data-action="comment" data-id="${item.id}">Enviar</button></div></div>
         <div class="kanban-card-actions">
           <button data-action="edit" data-id="${item.id}">Editar</button>
           <button data-action="delete" data-id="${item.id}">Excluir</button>
@@ -594,6 +615,8 @@ function renderKanban(items) {
       </div>
     `).join("");
   });
+  $$('.kanban-card [data-action="check"]').forEach((input) => input.addEventListener("change", async (e) => { e.stopPropagation(); const task = kanbanItems.find((item) => item.id === input.dataset.id); const checklist = (task.checklist || []).map((check) => check.id === input.dataset.checkId ? { ...check, done: !check.done } : check); await kanbanApi.update(task.id, { checklist }); }));
+  $$('.kanban-card [data-action="comment"]').forEach((btn) => btn.addEventListener("click", async (e) => { e.stopPropagation(); const input = $(`#kanban-comment-${btn.dataset.id}`); const text = input.value.trim(); if (!text) return; const task = kanbanItems.find((item) => item.id === btn.dataset.id); await kanbanApi.update(task.id, { comments: [...(task.comments || []), { id: projectDraftId(), text, author: currentUser.displayName || "Você", date: new Date().toISOString() }] }); }));
 
   $$(".kanban-card").forEach((card) => {
     card.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", card.dataset.id));
@@ -613,13 +636,21 @@ function renderKanban(items) {
 $$(".kanban-dropzone").forEach((zone) => {
   zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag-over"); });
   zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
-  zone.addEventListener("drop", (e) => {
+  zone.addEventListener("drop", async (e) => {
     e.preventDefault();
     zone.classList.remove("drag-over");
     const id = e.dataTransfer.getData("text/plain");
     const status = zone.closest(".kanban-col").dataset.status;
     const existing = kanbanItems.find((item) => item.id === id);
-    kanbanApi.update(id, { status, completedAt: status === "done" ? (existing?.completedAt || new Date().toISOString()) : null });
+    await kanbanApi.update(id, { status, completedAt: status === "done" ? (existing?.completedAt || new Date().toISOString()) : null });
+    if (status === "done" && existing?.recurrence && !existing.recurrenceGeneratedAt) {
+      let nextDeadline = existing.deadline ? new Date(existing.deadline + "T00:00:00") : new Date();
+      if (existing.recurrence === "semanal") nextDeadline.setDate(nextDeadline.getDate() + 7); else nextDeadline.setMonth(nextDeadline.getMonth() + 1);
+      const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, completedAt: _completedAt, status: _status, comments: _comments, recurrenceGeneratedAt: _generated, userId: _userId, ...copy } = existing;
+      await kanbanApi.add(currentUser.uid, { ...copy, title: existing.title, status: "todo", deadline: nextDeadline.toISOString().slice(0, 10), checklist: (existing.checklist || []).map((item) => ({ ...item, done: false })), comments: [] });
+      await kanbanApi.update(id, { recurrenceGeneratedAt: new Date().toISOString() });
+      showToast("Próxima demanda recorrente criada.");
+    }
   });
 });
 
@@ -679,6 +710,10 @@ $("#projeto-checklist-editor").addEventListener("input", (event) => {
   item[event.target.dataset.field] = event.target.type === "checkbox" ? event.target.checked : event.target.value;
   if (event.target.type === "checkbox") renderProjectChecklistEditor();
 });
+
+$("#kanban-search").addEventListener("input", () => renderKanban());
+$("#kanban-filter-priority").addEventListener("change", () => renderKanban());
+$("#kanban-filter-label").addEventListener("change", () => renderKanban());
 $("#projeto-checklist-editor").addEventListener("click", (event) => { if (event.target.dataset.action !== "remove") return; projetoChecklistDraft = projetoChecklistDraft.filter((item) => item.id !== event.target.closest(".project-editor-row").dataset.id); renderProjectChecklistEditor(); });
 $("#projeto-links-editor").addEventListener("input", (event) => { const row = event.target.closest(".project-editor-row"); const link = projetoLinksDraft.find((entry) => entry.id === row?.dataset.id); if (link) link[event.target.dataset.field] = event.target.value; });
 $("#projeto-links-editor").addEventListener("click", (event) => { if (event.target.dataset.action !== "remove") return; projetoLinksDraft = projetoLinksDraft.filter((link) => link.id !== event.target.closest(".project-editor-row").dataset.id); renderProjectLinksEditor(); });
@@ -1836,11 +1871,15 @@ function renderInsights() {
   const activeInsightProjects = projectItems.filter((project) => project.status !== "Concluido");
   const projectsAtRisk = activeInsightProjects.filter((project) => (project.risks || []).length || (project.hoursEstimated > 0 && project.hoursSpent > project.hoursEstimated));
   const projectsWithoutAction = activeInsightProjects.filter((project) => !project.nextAction).length;
+  const openInsightTasks = kanbanItems.filter((task) => task.status !== "done");
+  const openEffort = openInsightTasks.reduce((sum, task) => sum + (Number(task.effort) || 3), 0);
+  const overdueTasks = openInsightTasks.filter((task) => task.deadline && task.deadline < now.toISOString().slice(0, 10)).length;
   $("#insights-summary").innerHTML = `
     <div class="insight-summary-item"><span class="insight-summary-emoji">✓</span><strong>${completionRate}% de conversão</strong><br>${completedInPeriod.length} conclusão(ões) para ${createdCount} novo(s) item(ns) no período.</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">↻</span>${bestHabit ? `<strong>${escapeHtml(bestHabit.title)}</strong><br>É seu hábito mais consistente, com ${bestHabit.score}% de aderência.` : "Cadastre hábitos para descobrir seu ritmo mais consistente."}</div>
     <div class="insight-summary-item"><span class="insight-summary-emoji">◎</span>${avgGoalProgress === null ? "Cadastre metas para acompanhar sua evolução." : `<strong>${avgGoalProgress}% de progresso médio</strong><br>em ${activeGoals.length} meta(s) ainda ativa(s).`}</div>
-    <div class="insight-summary-item"><span class="insight-summary-emoji">▣</span>${activeInsightProjects.length ? `<strong>${projectsAtRisk.length} projeto(s) em atenção</strong><br>${projectsWithoutAction} sem próxima ação definida.` : "Cadastre projetos para acompanhar riscos e execução."}</div>`;
+    <div class="insight-summary-item"><span class="insight-summary-emoji">▣</span>${activeInsightProjects.length ? `<strong>${projectsAtRisk.length} projeto(s) em atenção</strong><br>${projectsWithoutAction} sem próxima ação definida.` : "Cadastre projetos para acompanhar riscos e execução."}</div>
+    <div class="insight-summary-item"><span class="insight-summary-emoji">▤</span><strong>${openEffort} pontos em aberto</strong><br>${overdueTasks} demanda(s) atrasada(s) em ${openInsightTasks.length} ativa(s).</div>`;
 }
 
 $("#insights-period").addEventListener("change", renderInsights);

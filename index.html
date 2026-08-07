@@ -330,11 +330,25 @@
       <div id="kanban-form-wrap" class="form-card hidden">
         <input type="hidden" id="kanban-edit-id" />
         <input type="text" id="kanban-title" class="input" placeholder="Título da demanda" />
+        <div class="form-row form-row-3">
+          <select id="kanban-priority" class="input select"><option value="Media">Prioridade média</option><option value="Baixa">Prioridade baixa</option><option value="Alta">Prioridade alta</option><option value="Critica">Prioridade crítica</option></select>
+          <select id="kanban-effort" class="input select"><option value="1">1 ponto · rápida</option><option value="2">2 pontos · pequena</option><option value="3" selected>3 pontos · média</option><option value="5">5 pontos · grande</option><option value="8">8 pontos · complexa</option></select>
+          <input type="date" id="kanban-deadline" class="input mono" title="Prazo" />
+        </div>
+        <div class="form-row form-row-2"><input type="text" id="kanban-labels" class="input" placeholder="Etiquetas separadas por vírgula" /><input type="text" id="kanban-context" class="input" placeholder="Responsável ou contexto" /></div>
         <textarea id="kanban-desc" class="input textarea" rows="4" placeholder="Descrição, chamado, escopo…"></textarea>
+        <textarea id="kanban-checklist" class="input textarea" rows="3" placeholder="Checklist — um item por linha"></textarea>
+        <label class="field-label">Recorrência<select id="kanban-recurrence" class="input select"><option value="">Não recorrente</option><option value="semanal">Semanal</option><option value="mensal">Mensal</option></select></label>
         <div class="form-actions">
           <button class="btn btn-ghost" id="kanban-cancel-btn">Cancelar</button>
           <button class="btn btn-primary" data-accent="teal" id="kanban-save-btn">Salvar</button>
         </div>
+      </div>
+
+      <div class="toolbar kanban-toolbar">
+        <input type="search" id="kanban-search" class="input" placeholder="Buscar demandas…" />
+        <select id="kanban-filter-priority" class="input select"><option value="">Todas as prioridades</option><option value="Baixa">Baixa</option><option value="Media">Média</option><option value="Alta">Alta</option><option value="Critica">Crítica</option></select>
+        <select id="kanban-filter-label" class="input select"><option value="">Todas as etiquetas</option></select>
       </div>
 
       <div class="kanban-board">

@@ -737,6 +737,15 @@ html[data-theme="light"] .icon-moon { display: block; }
 .kanban-card-desc { font-size: 0.8rem; color: var(--ink-muted); margin: 0 0 0.5rem; white-space: pre-wrap; }
 .kanban-card-actions { display: flex; gap: 0.5rem; }
 .kanban-card-actions button { border: none; background: none; color: var(--ink-muted); font-size: 0.74rem; text-decoration: underline; padding: 0; }
+.kanban-toolbar .input { min-width: 170px; }
+.kanban-card-badges, .kanban-labels, .kanban-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-bottom: 0.45rem; }
+.kanban-effort, .kanban-recurring { font: 0.64rem var(--font-mono); color: var(--ink-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 0.16rem 0.45rem; }
+.kanban-labels span { font: 0.64rem var(--font-mono); color: var(--teal); background: var(--teal-soft); border-radius: 20px; padding: 0.15rem 0.45rem; }
+.kanban-meta { color: var(--ink-faint); font: 0.68rem var(--font-mono); justify-content: space-between; }.kanban-meta .overdue { color: var(--rust); }
+.kanban-checklist { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.55rem 0; padding: 0.5rem; background: var(--surface); border-radius: 8px; }
+.kanban-checklist label { display: flex; align-items: center; gap: 0.4rem; color: var(--ink-muted); font-size: 0.72rem; cursor: pointer; }.kanban-checklist input { accent-color: var(--teal); }.kanban-checklist label.done span { text-decoration: line-through; color: var(--ink-faint); }
+.kanban-comments { border-top: 1px solid var(--border); margin-top: 0.55rem; padding-top: 0.45rem; }.kanban-comments p { margin: 0.2rem 0; color: var(--ink-muted); font-size: 0.68rem; }.kanban-comments p strong { color: var(--ink); }.kanban-comments > div { display: flex; gap: 0.35rem; margin-top: 0.4rem; }.kanban-comments .input { margin: 0; padding: 0.4rem 0.5rem; font-size: 0.7rem; }.kanban-comments button { border: none; background: none; color: var(--teal); font-size: 0.7rem; }
+.kanban-card.priority-critica { border-left: 3px solid #FF6B6B; }.kanban-card.priority-alta { border-left: 3px solid var(--rust); }
 
 /* ---------------- Agenda ---------------- */
 .agenda-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; align-items: start; }
