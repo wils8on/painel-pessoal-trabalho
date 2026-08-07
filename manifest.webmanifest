@@ -1,0 +1,12 @@
+{
+  "name": "Dossiê — Painel Pessoal",
+  "short_name": "Dossiê",
+  "description": "Painel pessoal de produtividade, diário, projetos e relacionamentos.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B0A14",
+  "theme_color": "#8B5CF6",
+  "lang": "pt-BR",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

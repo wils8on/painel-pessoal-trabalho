@@ -121,7 +121,7 @@ Todas as coleções são criadas automaticamente pelo Firestore na primeira grav
 - O editor do Diário aceita uma sintaxe leve de Markdown: `# título`, `**negrito**`, `*itálico*` e listas com `- item`.
 - Todas as consultas ao Firestore filtram apenas por `userId` (sem `orderBy` composto), e a ordenação final é feita no navegador — isso evita a necessidade de criar índices compostos manualmente no console do Firebase.
 
-## Roadmap — "Life OS" (Fases 1 a 9 concluídas)
+## Roadmap — "Life OS" (Fases 1 a 10 concluídas)
 
 O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos implementando por fases, para não comprometer a qualidade numa única entrega.
 
@@ -192,8 +192,16 @@ O pedido de evolução para um "Life OS" completo tinha 17 frentes. Estamos impl
 - ✅ Resumo automático dos últimos sete dias e widget configurável no Dashboard.
 - ✅ Exportação consolidada dos indicadores em CSV.
 
+**Fase 10 — UX, confiabilidade e mobile:**
+
+- ✅ PWA instalável, shell offline e indicador de conexão.
+- ✅ Backup completo em JSON e restauração protegida por confirmação.
+- ✅ Estado global de carregamento e mensagens de erro de sincronização.
+- ✅ Proteção contra saída com alterações não salvas.
+- ✅ Atalhos: `/` ou `Ctrl+K` busca, `N` novo item, `Alt+1…0` navegação e `Esc` fechar.
+- ✅ Preferências persistentes, contraste reforçado e refinamentos mobile.
+
 **Ainda não implementado** (próximas fases):
 
-- Melhorias de UX mais amplas (drag-and-drop generalizado, skeleton loading, menus de contexto, atalhos adicionais)
 
 Cada uma dessas frentes pode ser pedida como uma próxima fase separada.

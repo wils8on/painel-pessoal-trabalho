@@ -152,6 +152,8 @@ setInterval(updateClock, 30000);
 --------------------------------------------------------- */
 let currentUser = null;
 const unsubscribers = [];
+let initialCollectionsPending = new Set();
+function finishInitialLoad(collectionName) { initialCollectionsPending.delete(collectionName); if (!initialCollectionsPending.size) $("#app-loading").classList.add("hidden"); }
 
 $("#google-signin-btn").addEventListener("click", async () => {
   try {
@@ -198,7 +200,8 @@ function makeCollectionApi(collectionName) {
         const items = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
         callback(items);
-      }, (err) => console.error(`Erro ao ler ${collectionName}:`, err));
+        finishInitialLoad(collectionName);
+      }, (err) => { console.error(`Erro ao ler ${collectionName}:`, err); finishInitialLoad(collectionName); showToast(`Falha ao carregar ${collectionName}. Verifique a conexão e tente novamente.`, "error"); });
       unsubscribers.push(unsub);
       return unsub;
     },
@@ -224,6 +227,7 @@ const goalsApi = makeCollectionApi("goals");
 const habitsApi = makeCollectionApi("habits");
 
 function startAllModules(uid) {
+  initialCollectionsPending = new Set(["diaryEntries","ahsdNotes","kanbanTasks","projects","agendaEvents","birthdays","goals","habits"]); $("#app-loading").classList.remove("hidden");
   diaryApi.subscribe(uid, renderDiary);
   ahsdApi.subscribe(uid, renderAhsd);
   kanbanApi.subscribe(uid, renderKanban);
@@ -233,6 +237,15 @@ function startAllModules(uid) {
   goalsApi.subscribe(uid, renderGoals);
   habitsApi.subscribe(uid, renderHabits);
 }
+
+const BACKUP_COLLECTIONS = { diaryEntries: { api: diaryApi, get: () => diaryItems }, ahsdNotes: { api: ahsdApi, get: () => ahsdItems }, kanbanTasks: { api: kanbanApi, get: () => kanbanItems }, projects: { api: projectsApi, get: () => projectItems }, agendaEvents: { api: eventsApi, get: () => eventItems }, birthdays: { api: birthdaysApi, get: () => birthdayItems }, goals: { api: goalsApi, get: () => goalItems }, habits: { api: habitsApi, get: () => habitItems } };
+$("#backup-export-btn").addEventListener("click", () => { if (!currentUser) return; const data = { version: 1, exportedAt: new Date().toISOString(), collections: Object.fromEntries(Object.entries(BACKUP_COLLECTIONS).map(([name, config]) => [name, config.get()])) }; const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const link = document.createElement("a"); link.href = url; link.download = `nova-backup-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(url); showToast("Backup exportado."); });
+$("#backup-import-btn").addEventListener("click", () => $("#backup-import-file").click());
+$("#backup-import-file").addEventListener("change", async (event) => { const file = event.target.files?.[0]; if (!file || !currentUser) return; try { const backup = JSON.parse(await file.text()); if (!backup.collections || !confirm("Restaurar este backup? Os registros serão adicionados e dados existentes não serão apagados.")) return; let count = 0; for (const [name, items] of Object.entries(backup.collections)) { const config = BACKUP_COLLECTIONS[name]; if (!config || !Array.isArray(items)) continue; for (const raw of items) { const { id, userId, createdAt, updatedAt, ...data } = raw; await config.api.add(currentUser.uid, data); count++; } } showToast(`${count} registro(s) restaurado(s).`); } catch (err) { console.error(err); showToast("Backup inválido ou não foi possível restaurar.", "error"); } finally { event.target.value = ""; } });
+
+function updateConnectionState() { const offline = !navigator.onLine; $("#connection-banner").classList.toggle("hidden", !offline); document.body.classList.toggle("is-offline", offline); if (!offline) showToast("Conexão restabelecida."); }
+window.addEventListener("offline", updateConnectionState); window.addEventListener("online", updateConnectionState); updateConnectionState();
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch((err) => console.warn("Service Worker:", err)));
 
 /* =========================================================
    MÓDULO 1 — Diário & Ideias Literárias
@@ -2282,8 +2295,21 @@ document.addEventListener("keydown", (e) => {
     $("#cmdk-overlay").classList.contains("hidden") ? openCmdk() : closeCmdk();
   } else if (e.key === "Escape" && !$("#cmdk-overlay").classList.contains("hidden")) {
     closeCmdk();
+  } else if (e.key === "Escape") {
+    const openForm = $(".form-card:not(.hidden)"); if (openForm && (!formDirty || confirm("Descartar alterações não salvas?"))) { openForm.classList.add("hidden"); formDirty = false; }
+  } else if (e.key === "/" && !["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName)) {
+    e.preventDefault(); if (currentUser) openCmdk();
+  } else if (e.altKey && /^[0-9]$/.test(e.key)) {
+    const views = ["dashboard","diario","literatura","ahsd","kanban","projetos","metas","habitos","agenda","pessoas"]; const index = e.key === "0" ? 9 : Number(e.key)-1; if (views[index]) { e.preventDefault(); switchView(views[index]); }
+  } else if (e.key.toLowerCase() === "n" && !["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName)) {
+    const active = $(".view.active")?.id.replace("view-",""); const newButtons = { diario:"#diario-new-btn", literatura:"#literatura-new-btn", kanban:"#kanban-new-btn", projetos:"#projeto-new-btn", metas:"#meta-new-btn", habitos:"#habito-new-btn", agenda:"#evento-new-btn", pessoas:"#pessoa-new-btn", ahsd:"#ahsd-new-btn" }; if (newButtons[active]) { e.preventDefault(); $(newButtons[active]).click(); }
   }
 });
+
+let formDirty = false;
+document.addEventListener("input", (event) => { if (event.target.closest(".form-card")) formDirty = true; }); document.addEventListener("change", (event) => { if (event.target.closest(".form-card")) formDirty = true; });
+document.addEventListener("click", (event) => { if (event.target.matches("[id$=save-btn], #pessoa-save")) formDirty = false; });
+window.addEventListener("beforeunload", (event) => { if (formDirty) { event.preventDefault(); event.returnValue = ""; } });
 
 /* =========================================================
    CALENDÁRIO INTERATIVO — Dashboard
