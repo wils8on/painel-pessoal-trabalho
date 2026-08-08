@@ -1379,6 +1379,7 @@ function renderGoals(items) {
 let habitItems = [];
 const habitoForm = $("#habito-form-wrap");
 const HABIT_FREQ_LABEL = { diario: "Diário", semanal: "Semanal", mensal: "Mensal" };
+const habitCleanupPending = new Set();
 
 function updateHabitTargetVisibility() {
   const freq = $("#habito-frequency").value;
@@ -1444,6 +1445,9 @@ function openHabitEntry(id) {
 async function toggleHabitCompletion(id, dateStr) {
   const item = habitItems.find((i) => i.id === id);
   if (!item) return;
+  const today = new Date();
+  const localTodayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
+  if (dateStr > localTodayStr) return showToast("Não é possível marcar um hábito em uma data futura.", "error");
   const completions = item.completions || [];
   const next = completions.includes(dateStr) ? completions.filter((d) => d !== dateStr) : [...completions, dateStr];
   try {
@@ -1528,7 +1532,21 @@ function buildHabitHeatmap(habit, days = 70) {
 }
 
 function renderHabits(items) {
-  if (items) habitItems = items;
+  if (items) {
+    const today = new Date();
+    const localTodayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
+    habitItems = items.map((item) => {
+      const completions = item.completions || [];
+      const validCompletions = completions.filter((date) => date <= localTodayStr);
+      if (validCompletions.length !== completions.length && !habitCleanupPending.has(item.id)) {
+        habitCleanupPending.add(item.id);
+        habitsApi.update(item.id, { completions: validCompletions })
+          .catch((error) => console.error("Falha ao remover marcação futura inválida.", error))
+          .finally(() => habitCleanupPending.delete(item.id));
+      }
+      return { ...item, completions: validCompletions };
+    });
+  }
   const sorted = [...habitItems].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   $("#habito-empty").classList.toggle("hidden", sorted.length > 0);
 
@@ -1974,7 +1992,8 @@ function refreshDashboard() {
   }).join("");
 
   // ---- Metas em destaque ----
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const localToday = new Date();
+  const todayStr = ymd(localToday.getFullYear(), localToday.getMonth(), localToday.getDate());
   const highlightGoals = [...goalItems]
     .filter((g) => g.status !== "Concluida")
     .sort((a, b) => {
@@ -1999,25 +2018,16 @@ function refreshDashboard() {
   $("#dash-habits-today").innerHTML = habitItems.map((h) => {
     const streak = getHabitStreak(h);
     const streakUnit = h.frequency === "diario" ? "d" : h.frequency === "semanal" ? "sem" : "mês";
-    let doneCurrentPeriod;
-    if (h.frequency === "diario") {
-      doneCurrentPeriod = (h.completions || []).includes(todayStr);
-    } else {
-      const keyFn = h.frequency === "semanal" ? getWeekKey : getMonthKey;
-      const target = h.target || 1;
-      const currentKey = keyFn(new Date());
-      const count = (h.completions || []).filter((d) => keyFn(new Date(d + "T00:00:00")) === currentKey).length;
-      doneCurrentPeriod = count >= target;
-    }
+    const doneToday = (h.completions || []).includes(todayStr);
     return `
-      <div class="habit-today-row ${doneCurrentPeriod ? "done" : ""}" data-id="${h.id}">
-        <span class="habit-today-check"></span>
+      <div class="habit-today-row ${doneToday ? "done" : ""}" data-id="${h.id}">
+        <button type="button" class="habit-today-check" data-action="toggle-dashboard-habit" data-id="${h.id}" aria-label="${doneToday ? "Desmarcar" : "Marcar"} ${escapeHtml(h.title)} hoje"></button>
         <span class="habit-today-name">${escapeHtml(h.emoji || "🔁")} ${escapeHtml(h.title)}</span>
         <span class="habit-today-streak">🔥 ${streak}${streakUnit}</span>
       </div>
     `;
   }).join("");
-  $$("#dash-habits-today .habit-today-row").forEach((row) => row.addEventListener("click", () => toggleHabitCompletion(row.dataset.id, todayStr)));
+  $$('[data-action="toggle-dashboard-habit"]', $("#dash-habits-today")).forEach((button) => button.addEventListener("click", () => toggleHabitCompletion(button.dataset.id, todayStr)));
 
   // ---- Prazos próximos (projetos + eventos) ----
   const projectDeadlines = projectItems
