@@ -1,4 +1,4 @@
-const CACHE = "dossie-v11.3";
+const CACHE = "dossie-v11.4";
 const APP_SHELL = ["./", "./index.html", "./css/style.css", "./js/app.js", "./js/core-utils.js", "./js/firebase-config.js", "./js/cloudinary-config.js", "./manifest.webmanifest", "./icon.svg"];
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (event) => event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim())));
