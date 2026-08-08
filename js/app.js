@@ -86,6 +86,7 @@ function upgradeInlineFormToModal({ formSelector, editSelector, createTitle, edi
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (!$("#cmdk-overlay")?.classList.contains("hidden")) return;
+  if (!$("#ahsd-detail-overlay")?.classList.contains("hidden")) { closeAhsdDetail(); return; }
   const activeOverlay = $(".record-modal-overlay:not(.hidden)");
   activeOverlay?._closeRecordModal?.();
 });
@@ -549,6 +550,43 @@ const AHSD_TAGS = [
 let ahsdTagsDraft = [];
 let ahsdActiveTagFilter = null;
 
+const ahsdDetailOverlay = document.createElement("div");
+ahsdDetailOverlay.id = "ahsd-detail-overlay";
+ahsdDetailOverlay.className = "record-modal-overlay ahsd-detail-overlay hidden";
+ahsdDetailOverlay.innerHTML = `<article class="glass-card ahsd-detail-modal" role="dialog" aria-modal="true" aria-labelledby="ahsd-detail-title"></article>`;
+document.body.appendChild(ahsdDetailOverlay);
+
+function closeAhsdDetail() {
+  ahsdDetailOverlay.classList.add("hidden");
+  if (!$(".record-modal-overlay:not(.hidden), .person-modal-overlay:not(.hidden)")) document.body.classList.remove("modal-open");
+}
+
+function openAhsdDetail(id) {
+  const item = ahsdItems.find((entry) => entry.id === id);
+  if (!item) return;
+  $(".ahsd-detail-modal", ahsdDetailOverlay).innerHTML = `
+    <div class="record-modal-head">
+      <div><h3 id="ahsd-detail-title">Registro AH/SD</h3><p>${fmtDateTime(new Date(item.dateTime))}</p></div>
+      <button type="button" class="icon-btn" data-detail-action="close" aria-label="Fechar">×</button>
+    </div>
+    <p class="ahsd-detail-content">${escapeHtml(item.content)}</p>
+    ${(item.tags || []).length ? `<div class="timeline-tags">${item.tags.map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+    <div class="form-actions">
+      <button type="button" class="btn btn-ghost" data-detail-action="close">Fechar</button>
+      <button type="button" class="btn btn-primary" data-accent="plum" data-detail-action="edit">Editar registro</button>
+    </div>
+  `;
+  ahsdDetailOverlay.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  $$('[data-detail-action="close"]', ahsdDetailOverlay).forEach((button) => button.addEventListener("click", closeAhsdDetail));
+  $('[data-detail-action="edit"]', ahsdDetailOverlay).addEventListener("click", () => {
+    closeAhsdDetail();
+    openAhsdEntry(item.id);
+  });
+}
+
+ahsdDetailOverlay.addEventListener("click", (event) => { if (event.target === ahsdDetailOverlay) closeAhsdDetail(); });
+
 function renderAhsdTagToggles() {
   $("#ahsd-tag-toggle-group").innerHTML = AHSD_TAGS.map((tag) => `
     <button type="button" class="tag-toggle ${ahsdTagsDraft.includes(tag) ? "active" : ""}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>
@@ -650,21 +688,30 @@ function renderAhsd(items) {
 
   $("#ahsd-empty").classList.toggle("hidden", filtered.length > 0);
   $("#ahsd-list").innerHTML = filtered.map((item) => `
-    <div class="timeline-item">
+    <article class="timeline-item ahsd-compact-card" data-view-id="${item.id}" tabindex="0" role="button" aria-label="Abrir registro de ${fmtDateTime(new Date(item.dateTime))}">
       <div class="timeline-date">${fmtDateTime(new Date(item.dateTime))}</div>
       <p class="timeline-text">${escapeHtml(item.content)}</p>
       ${(item.tags || []).length ? `<div class="timeline-tags">${item.tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       <div class="timeline-actions">
+        <button data-action="view" data-id="${item.id}">Ver detalhes</button>
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
       </div>
-    </div>
+    </article>
   `).join("");
 
-  $$('#ahsd-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openAhsdEntry(btn.dataset.id)));
-  $$('#ahsd-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
+  $$('#ahsd-list [data-action="view"]').forEach((btn) => btn.addEventListener("click", (event) => { event.stopPropagation(); openAhsdDetail(btn.dataset.id); }));
+  $$('#ahsd-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", (event) => { event.stopPropagation(); openAhsdEntry(btn.dataset.id); }));
+  $$('#ahsd-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", (event) => {
+    event.stopPropagation();
     if (confirm("Excluir este registro?")) { ahsdApi.remove(btn.dataset.id); showToast("Registro excluído."); }
   }));
+  $$("#ahsd-list [data-view-id]").forEach((card) => {
+    card.addEventListener("click", () => openAhsdDetail(card.dataset.viewId));
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openAhsdDetail(card.dataset.viewId); }
+    });
+  });
 
   refreshDashboard();
 }
