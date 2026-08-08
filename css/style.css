@@ -565,6 +565,10 @@ html[data-theme="light"] .icon-moon { display: block; }
 .progress-bar { height: 8px; border-radius: 4px; background: var(--surface-strong); overflow: hidden; }
 .progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--teal), #7BF0D3); transition: width 0.3s ease; }
 .progress-value { font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-muted); }
+.goal-auto-preview { margin: 0.65rem 0 0.85rem; padding: 0.7rem 0.8rem; border: 1px solid var(--teal); border-radius: var(--radius-sm); background: var(--teal-soft); color: var(--ink); font-size: 0.78rem; line-height: 1.5; }
+.goal-progress-source { font: 0.68rem var(--font-mono); color: var(--teal); }
+.goal-progress-breakdown { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+.goal-progress-breakdown span { padding: 0.18rem 0.45rem; border-radius: 20px; background: var(--surface-strong); color: var(--ink-muted); font-size: 0.68rem; }
 
 /* ---------------- Projetos avançados ---------------- */
 .project-form-section { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.8rem; margin-bottom: 0.8rem; background: rgba(255,255,255,0.018); }

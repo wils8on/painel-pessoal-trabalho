@@ -518,12 +518,14 @@
             <option value="Concluida">Concluída</option>
           </select>
         </div>
-        <div class="form-row">
-          <label class="field-label">Prazo<input type="date" id="meta-deadline" class="input mono" /></label>
+        <div class="form-row form-row-2">
+          <label class="field-label">Início<input type="date" id="meta-start-date" class="input mono" /></label>
+          <label class="field-label">Fim<input type="date" id="meta-deadline" class="input mono" /></label>
         </div>
         <textarea id="meta-desc" class="input textarea" rows="3" placeholder="Descrição / o que significa alcançar essa meta"></textarea>
-        <label class="range-label">Progresso: <span id="meta-progress-value">0</span>%</label>
-        <input type="range" id="meta-progress" min="0" max="100" value="0" class="range" />
+        <label class="field-label">Cálculo do progresso<select id="meta-progress-mode" class="input select"><option value="automatico">Automático pelos vínculos</option><option value="manual">Manual</option></select></label>
+        <div id="meta-manual-progress"><label class="range-label">Progresso: <span id="meta-progress-value">0</span>%</label><input type="range" id="meta-progress" min="0" max="100" value="0" class="range" /></div>
+        <div id="meta-auto-progress" class="goal-auto-preview hidden"></div>
 
         <p class="field-hint">Vincular a projetos, demandas e/ou hábitos (opcional):</p>
         <p class="tag-toggle-group-label">Projetos</p>

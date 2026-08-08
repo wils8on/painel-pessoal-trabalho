@@ -812,6 +812,7 @@ function renderKanban(items) {
     if (confirm("Excluir esta demanda?")) { kanbanApi.remove(btn.dataset.id); showToast("Demanda excluída."); }
   }));
 
+  if (goalItems.length) renderGoals();
   refreshDashboard();
 }
 
@@ -1135,6 +1136,7 @@ function renderProjects(items) {
     if (confirm("Excluir este projeto?")) { projectsApi.remove(btn.dataset.id); showToast("Projeto excluído."); }
   }));
 
+  if (goalItems.length) renderGoals();
   refreshDashboard();
 }
 
@@ -1149,6 +1151,80 @@ let metaLinkHabits = [];
 
 const GOAL_STATUS_LABEL = { "Nao iniciada": "Não iniciada", "Em andamento": "Em andamento", "Pausada": "Pausada", "Concluida": "Concluída" };
 
+function goalHasLinks(goal) {
+  return (goal.linkedProjectIds || []).length + (goal.linkedTaskIds || []).length + (goal.linkedHabitIds || []).length > 0;
+}
+
+function getGoalProgressMode(goal) {
+  return goal.progressMode || (goalHasLinks(goal) ? "automatico" : "manual");
+}
+
+function localDateValue(date) {
+  return ymd(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function getGoalPeriod(goal) {
+  const linkedCompletionDates = (goal.linkedHabitIds || [])
+    .flatMap((id) => habitItems.find((habit) => habit.id === id)?.completions || [])
+    .sort();
+  const createdDate = tsToDate(goal.createdAt);
+  const today = new Date();
+  const startStr = goal.startDate || (createdDate ? localDateValue(createdDate) : linkedCompletionDates[0]) || localDateValue(today);
+  const endStr = goal.deadline || localDateValue(today);
+  return { startStr, endStr, start: new Date(`${startStr}T00:00:00`), end: new Date(`${endStr}T00:00:00`) };
+}
+
+function daysInclusive(start, end) {
+  if (end < start) return 0;
+  return Math.floor((end - start) / 86400000) + 1;
+}
+
+function monthsInclusive(start, end) {
+  if (end < start) return 0;
+  return (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1;
+}
+
+function calculateGoalProgress(goal) {
+  if (getGoalProgressMode(goal) === "manual") return { progress: clampPercent(goal.progress), parts: [], automatic: false };
+  const { startStr, endStr, start, end } = getGoalPeriod(goal);
+  const parts = [];
+  (goal.linkedProjectIds || []).forEach((id) => {
+    const project = projectItems.find((item) => item.id === id);
+    if (project) parts.push({ type: "Projeto", label: project.title, progress: project.status === "Concluido" ? 100 : checklistProgress(project.checklist || [], project.progress) });
+  });
+  (goal.linkedTaskIds || []).forEach((id) => {
+    const task = kanbanItems.find((item) => item.id === id);
+    if (task) parts.push({ type: "Demanda", label: task.title, progress: task.status === "done" ? 100 : 0 });
+  });
+  (goal.linkedHabitIds || []).forEach((id) => {
+    const habit = habitItems.find((item) => item.id === id);
+    if (!habit) return;
+    const habitCreated = tsToDate(habit.createdAt);
+    const effectiveStart = habitCreated && habitCreated > start ? new Date(habitCreated.getFullYear(), habitCreated.getMonth(), habitCreated.getDate()) : start;
+    const effectiveStartStr = localDateValue(effectiveStart);
+    const completed = (habit.completions || []).filter((date) => date >= effectiveStartStr && date <= endStr).length;
+    let expected;
+    if (habit.frequency === "semanal") expected = Math.ceil(daysInclusive(effectiveStart, end) / 7) * (habit.target || 1);
+    else if (habit.frequency === "mensal") expected = monthsInclusive(effectiveStart, end) * (habit.target || 1);
+    else expected = daysInclusive(effectiveStart, end);
+    parts.push({ type: "Hábito", label: habit.title, progress: expected ? clampPercent((completed / expected) * 100) : 0, completed, expected });
+  });
+  const progress = parts.length ? Math.round(parts.reduce((sum, part) => sum + part.progress, 0) / parts.length) : 0;
+  return { progress, parts, automatic: true, startStr, endStr };
+}
+
+function updateMetaProgressMode() {
+  const automatic = $("#meta-progress-mode").value === "automatico";
+  $("#meta-manual-progress").classList.toggle("hidden", automatic);
+  $("#meta-auto-progress").classList.toggle("hidden", !automatic);
+  if (!automatic) return;
+  const draft = { startDate: $("#meta-start-date").value || null, deadline: $("#meta-deadline").value || null, progressMode: "automatico", linkedProjectIds: metaLinkProjects, linkedTaskIds: metaLinkTasks, linkedHabitIds: metaLinkHabits };
+  const metrics = calculateGoalProgress(draft);
+  $("#meta-auto-progress").innerHTML = goalHasLinks(draft)
+    ? `<strong>${metrics.progress}% calculado automaticamente</strong><br>${metrics.parts.map((part) => `${escapeHtml(part.type)}: ${Math.round(part.progress)}%`).join(" · ")}`
+    : "Vincule ao menos um projeto, demanda ou hábito para calcular o progresso.";
+}
+
 function renderMetaProjectToggles() {
   $("#meta-link-projects").innerHTML = projectItems.length
     ? projectItems.map((p) => `<button type="button" class="tag-toggle ${metaLinkProjects.includes(p.id) ? "active" : ""}" data-id="${p.id}">${escapeHtml(p.title)}</button>`).join("")
@@ -1157,6 +1233,7 @@ function renderMetaProjectToggles() {
     const id = btn.dataset.id;
     metaLinkProjects = metaLinkProjects.includes(id) ? metaLinkProjects.filter((x) => x !== id) : [...metaLinkProjects, id];
     renderMetaProjectToggles();
+    updateMetaProgressMode();
   }));
 }
 function renderMetaTaskToggles() {
@@ -1167,6 +1244,7 @@ function renderMetaTaskToggles() {
     const id = btn.dataset.id;
     metaLinkTasks = metaLinkTasks.includes(id) ? metaLinkTasks.filter((x) => x !== id) : [...metaLinkTasks, id];
     renderMetaTaskToggles();
+    updateMetaProgressMode();
   }));
 }
 function renderMetaHabitToggles() {
@@ -1177,6 +1255,7 @@ function renderMetaHabitToggles() {
     const id = btn.dataset.id;
     metaLinkHabits = metaLinkHabits.includes(id) ? metaLinkHabits.filter((x) => x !== id) : [...metaLinkHabits, id];
     renderMetaHabitToggles();
+    updateMetaProgressMode();
   }));
 }
 
@@ -1197,35 +1276,49 @@ $("#meta-new-btn").addEventListener("click", () => {
   $("#meta-category").value = "Pessoal";
   $("#meta-priority").value = "Media";
   $("#meta-status").value = "Nao iniciada";
+  $("#meta-start-date").value = localDateValue(new Date());
   $("#meta-deadline").value = "";
+  $("#meta-progress-mode").value = "automatico";
   $("#meta-desc").value = "";
   $("#meta-progress").value = 0;
   $("#meta-progress-value").textContent = 0;
   metaLinkProjects = []; metaLinkTasks = []; metaLinkHabits = [];
   renderMetaProjectToggles(); renderMetaTaskToggles(); renderMetaHabitToggles();
+  updateMetaProgressMode();
   metaForm.classList.remove("hidden");
 });
 $("#meta-cancel-btn").addEventListener("click", () => metaForm.classList.add("hidden"));
 $("#meta-progress").addEventListener("input", (e) => { $("#meta-progress-value").textContent = e.target.value; });
+$("#meta-progress-mode").addEventListener("change", updateMetaProgressMode);
+[$("#meta-start-date"), $("#meta-deadline")].forEach((input) => input.addEventListener("change", updateMetaProgressMode));
 $("#meta-filter-status").addEventListener("change", () => renderGoals());
 $("#meta-search").addEventListener("input", () => renderGoals());
 
 $("#meta-save-btn").addEventListener("click", async () => {
   const title = $("#meta-title").value.trim();
   if (!title) return showToast("Informe o título da meta.", "error");
-  let newProgress = clampPercent($("#meta-progress").value);
   const editId = $("#meta-edit-id").value;
   const existing = editId ? goalItems.find((i) => i.id === editId) : null;
+  const startDate = $("#meta-start-date").value || null;
+  const deadline = $("#meta-deadline").value || null;
+  if (startDate && deadline && startDate > deadline) return showToast("A data inicial deve ser anterior à data final.", "error");
+  const progressMode = $("#meta-progress-mode").value;
+  const progressDraft = { ...existing, startDate, deadline, progressMode, progress: $("#meta-progress").value, linkedProjectIds: metaLinkProjects, linkedTaskIds: metaLinkTasks, linkedHabitIds: metaLinkHabits };
+  if (progressMode === "automatico" && !goalHasLinks(progressDraft)) return showToast("Vincule um projeto, demanda ou hábito para usar o progresso automático.", "error");
+  let newProgress = progressMode === "automatico" ? calculateGoalProgress(progressDraft).progress : clampPercent($("#meta-progress").value);
   const existingLog = existing?.progressLog || [];
   let goalStatus = $("#meta-status").value;
-  if (goalStatus === "Concluida") newProgress = 100;
+  if (progressMode === "manual" && goalStatus === "Concluida") newProgress = 100;
+  if (progressMode === "automatico" && goalStatus === "Concluida" && newProgress < 100) goalStatus = "Em andamento";
   if (newProgress >= 100) goalStatus = "Concluida";
   const payload = {
     title,
     category: $("#meta-category").value,
     priority: $("#meta-priority").value,
     status: goalStatus,
-    deadline: $("#meta-deadline").value || null,
+    startDate,
+    deadline,
+    progressMode,
     description: $("#meta-desc").value.trim(),
     progress: newProgress,
     linkedProjectIds: metaLinkProjects,
@@ -1250,6 +1343,7 @@ $("#meta-save-btn").addEventListener("click", async () => {
 async function quickUpdateGoalProgress(id, percent, note) {
   const item = goalItems.find((i) => i.id === id);
   if (!item) return;
+  if (getGoalProgressMode(item) === "automatico") return showToast("Esta meta é atualizada automaticamente pelos vínculos.", "error");
   const clamped = clampPercent(percent);
   const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: clamped, note: note?.trim() || "" }];
   try {
@@ -1270,7 +1364,9 @@ function openGoalEntry(id) {
   $("#meta-category").value = item.category || "Pessoal";
   $("#meta-priority").value = item.priority || "Media";
   $("#meta-status").value = item.status || "Nao iniciada";
+  $("#meta-start-date").value = item.startDate || getGoalPeriod(item).startStr;
   $("#meta-deadline").value = item.deadline || "";
+  $("#meta-progress-mode").value = getGoalProgressMode(item);
   $("#meta-desc").value = item.description || "";
   $("#meta-progress").value = item.progress || 0;
   $("#meta-progress-value").textContent = item.progress || 0;
@@ -1278,6 +1374,7 @@ function openGoalEntry(id) {
   metaLinkTasks = [...(item.linkedTaskIds || [])];
   metaLinkHabits = [...(item.linkedHabitIds || [])];
   renderMetaProjectToggles(); renderMetaTaskToggles(); renderMetaHabitToggles();
+  updateMetaProgressMode();
   metaForm.classList.remove("hidden");
 }
 
@@ -1292,6 +1389,8 @@ function renderGoals(items) {
 
   $("#meta-empty").classList.toggle("hidden", sorted.length > 0);
   $("#meta-list").innerHTML = sorted.map((item) => {
+    const metrics = calculateGoalProgress(item);
+    const effectiveProgress = metrics.progress;
     const priorityClass = PRIORITY_BADGE[item.priority] || "badge-media";
     const linkedProjects = (item.linkedProjectIds || []).map((id) => projectItems.find((p) => p.id === id)).filter(Boolean);
     const linkedTasks = (item.linkedTaskIds || []).map((id) => kanbanItems.find((p) => p.id === id)).filter(Boolean);
@@ -1319,10 +1418,10 @@ function renderGoals(items) {
       </div>
       <h3 class="entry-title">${escapeHtml(item.title)}</h3>
       ${item.description ? `<p class="entry-body">${escapeHtml(item.description)}</p>` : ""}
-      ${item.deadline ? `<div class="entry-meta"><span>Prazo: ${fmtDate(new Date(item.deadline + "T00:00:00"))}</span></div>` : ""}
-      <div class="progress-bar"><div class="progress-fill" style="width:${item.progress || 0}%"></div></div>
-      <span class="progress-value">${item.progress || 0}% concluído</span>
-      ${buildSparkline(log)}
+      ${(metrics.automatic || item.startDate || item.deadline) ? `<div class="entry-meta"><span>Período: ${metrics.startStr || item.startDate ? fmtDate(new Date((metrics.startStr || item.startDate) + "T00:00:00")) : "—"} → ${metrics.endStr || item.deadline ? fmtDate(new Date((metrics.endStr || item.deadline) + "T00:00:00")) : "—"}</span></div>` : ""}
+      <div class="progress-bar"><div class="progress-fill" style="width:${effectiveProgress}%"></div></div>
+      <span class="progress-value">${effectiveProgress}% concluído</span>
+      ${metrics.automatic ? `<span class="goal-progress-source">Calculado pelos vínculos</span><div class="goal-progress-breakdown">${metrics.parts.map((part) => `<span>${escapeHtml(part.type)} · ${escapeHtml(part.label)}: ${Math.round(part.progress)}%${part.expected != null ? ` (${part.completed}/${part.expected})` : ""}</span>`).join("")}</div>` : buildSparkline(log)}
       ${linksHtml ? `<div class="linked-chips">${linksHtml}</div>` : ""}
 
       <div class="progress-log">
@@ -1331,10 +1430,10 @@ function renderGoals(items) {
         </button>
         <div class="progress-log-panel hidden" id="goal-log-panel-${item.id}">
           ${logEntriesHtml ? `<div class="progress-log-entries">${logEntriesHtml}</div>` : `<p class="empty-state small">Nenhuma atualização registrada ainda.</p>`}
-          <div class="progress-log-form">
+          <div class="progress-log-form ${metrics.automatic ? "hidden" : ""}">
             <div class="form-row form-row-2">
               <label class="field-label">Novo progresso (%)
-                <input type="number" min="0" max="100" class="input mono" id="goal-quick-progress-${item.id}" value="${item.progress || 0}" />
+                <input type="number" min="0" max="100" class="input mono" id="goal-quick-progress-${item.id}" value="${effectiveProgress}" />
               </label>
               <label class="field-label">Observação (opcional)
                 <input type="text" class="input" id="goal-quick-note-${item.id}" placeholder="O que mudou?" />
@@ -1593,6 +1692,7 @@ function renderHabits(items) {
     if (confirm("Excluir este hábito?")) { habitsApi.remove(btn.dataset.id); showToast("Hábito excluído."); }
   }));
 
+  if (goalItems.length) renderGoals();
   refreshDashboard();
 }
 
@@ -2007,8 +2107,8 @@ function refreshDashboard() {
   $("#dash-goals-list").innerHTML = highlightGoals.map((g) => `
     <div class="mini-progress-row" data-id="${g.id}" style="cursor:pointer;">
       <span class="mp-name" title="${escapeHtml(g.title)}">${escapeHtml(g.title)}</span>
-      <span class="mp-track"><span class="mp-fill" style="width:${g.progress || 0}%"></span></span>
-      <span class="mp-pct">${g.progress || 0}%</span>
+      <span class="mp-track"><span class="mp-fill" style="width:${calculateGoalProgress(g).progress}%"></span></span>
+      <span class="mp-pct">${calculateGoalProgress(g).progress}%</span>
     </div>
   `).join("");
   $$("#dash-goals-list .mini-progress-row").forEach((row) => row.addEventListener("click", () => openGoalEntry(row.dataset.id)));
@@ -2127,7 +2227,7 @@ function renderInsights() {
     return { ...habit, actual, score: Math.min(100, Math.round((actual / Math.max(1, expected)) * 100)) };
   }).sort((a, b) => b.score - a.score);
   const habitConsistency = habitScores.length ? Math.round(habitScores.reduce((sum, habit) => sum + habit.score, 0) / habitScores.length) : null;
-  const avgGoalProgress = goalItems.length ? Math.round(goalItems.reduce((sum, goal) => sum + (Number(goal.progress) || 0), 0) / goalItems.length) : null;
+  const avgGoalProgress = goalItems.length ? Math.round(goalItems.reduce((sum, goal) => sum + calculateGoalProgress(goal).progress, 0) / goalItems.length) : null;
 
   const kpis = [
     { code: "PROD", value: createdCount, label: "itens criados no período", color: "var(--primary-2)", soft: "var(--primary-soft)" },
@@ -2181,7 +2281,7 @@ function renderInsights() {
 
   const rankedGoals = [...goalItems].sort((a, b) => (Number(b.progress) || 0) - (Number(a.progress) || 0)).slice(0, 6);
   $("#insights-goals").innerHTML = rankedGoals.length ? rankedGoals.map((goal) => `
-    <div class="insight-rank-row"><span class="insight-rank-name" title="${escapeHtml(goal.title)}">${escapeHtml(goal.title)}</span><span class="insight-rank-track"><span class="insight-rank-fill goal" style="width:${Number(goal.progress) || 0}%"></span></span><span class="insight-rank-value">${Number(goal.progress) || 0}%</span></div>`).join("")
+    <div class="insight-rank-row"><span class="insight-rank-name" title="${escapeHtml(goal.title)}">${escapeHtml(goal.title)}</span><span class="insight-rank-track"><span class="insight-rank-fill goal" style="width:${calculateGoalProgress(goal).progress}%"></span></span><span class="insight-rank-value">${calculateGoalProgress(goal).progress}%</span></div>`).join("")
     : `<div class="insights-empty">Cadastre metas para visualizar sua evolução.</div>`;
 
   const heatDays = Array.from({ length: 112 }, (_, index) => { const date = new Date(now); date.setHours(12,0,0,0); date.setDate(date.getDate() - (111-index)); return { date, score: dayScores[dayKey(date)] || 0 }; });
