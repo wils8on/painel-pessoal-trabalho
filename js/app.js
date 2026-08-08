@@ -28,6 +28,68 @@ import {
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
+function upgradeInlineFormToModal({ formSelector, editSelector, createTitle, editTitle, focusSelector, wide = false }) {
+  const form = $(formSelector);
+  if (!form) return;
+  const modalId = form.id.replace(/-form(-wrap)?$/, "-modal");
+  const overlay = document.createElement("div");
+  overlay.className = "record-modal-overlay hidden";
+  overlay.dataset.formModal = form.id;
+  overlay.setAttribute("role", "presentation");
+  document.body.appendChild(overlay);
+  overlay.appendChild(form);
+  form.classList.add("record-modal");
+  if (wide) form.classList.add("record-modal-wide");
+  form.setAttribute("role", "dialog");
+  form.setAttribute("aria-modal", "true");
+  form.setAttribute("aria-labelledby", `${modalId}-title`);
+  form.insertAdjacentHTML("afterbegin", `
+    <div class="record-modal-head">
+      <div>
+        <h3 id="${modalId}-title">${createTitle}</h3>
+        <p>Preencha as informações e salve quando concluir.</p>
+      </div>
+      <button type="button" class="icon-btn record-modal-close" aria-label="Fechar">×</button>
+    </div>
+  `);
+
+  const syncModal = () => {
+    const isOpen = !form.classList.contains("hidden");
+    overlay.classList.toggle("hidden", !isOpen);
+    if (isOpen) {
+      const editing = editSelector && $(editSelector)?.value;
+      $(`#${modalId}-title`).textContent = editing ? editTitle : createTitle;
+      document.body.classList.add("modal-open");
+      requestAnimationFrame(() => $(focusSelector)?.focus());
+    } else if (!$(".record-modal-overlay:not(.hidden), .person-modal-overlay:not(.hidden)")) {
+      document.body.classList.remove("modal-open");
+    }
+  };
+  const close = () => form.classList.add("hidden");
+  new MutationObserver(syncModal).observe(form, { attributes: true, attributeFilter: ["class"] });
+  $(".record-modal-close", form).addEventListener("click", close);
+  overlay.addEventListener("click", (event) => { if (event.target === overlay) close(); });
+  overlay._closeRecordModal = close;
+}
+
+[
+  { formSelector: "#diario-form-wrap", editSelector: "#diario-edit-id", createTitle: "Nova anotação", editTitle: "Editar anotação", focusSelector: "#diario-title", wide: true },
+  { formSelector: "#ahsd-form-wrap", editSelector: "#ahsd-edit-id", createTitle: "Nova observação AH/SD", editTitle: "Editar observação AH/SD", focusSelector: "#ahsd-content" },
+  { formSelector: "#kanban-form-wrap", editSelector: "#kanban-edit-id", createTitle: "Nova demanda", editTitle: "Editar demanda", focusSelector: "#kanban-title" },
+  { formSelector: "#projeto-form-wrap", editSelector: "#projeto-edit-id", createTitle: "Novo projeto", editTitle: "Editar projeto", focusSelector: "#projeto-title", wide: true },
+  { formSelector: "#meta-form-wrap", editSelector: "#meta-edit-id", createTitle: "Nova meta", editTitle: "Editar meta", focusSelector: "#meta-title" },
+  { formSelector: "#habito-form-wrap", editSelector: "#habito-edit-id", createTitle: "Novo hábito", editTitle: "Editar hábito", focusSelector: "#habito-title" },
+  { formSelector: "#evento-form-wrap", editSelector: "#evento-edit-id", createTitle: "Novo evento", editTitle: "Editar evento", focusSelector: "#evento-title" },
+  { formSelector: "#niver-form-wrap", editSelector: "#niver-edit-id", createTitle: "Novo aniversário", editTitle: "Editar aniversário", focusSelector: "#niver-name" },
+].forEach(upgradeInlineFormToModal);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (!$("#cmdk-overlay")?.classList.contains("hidden")) return;
+  const activeOverlay = $(".record-modal-overlay:not(.hidden)");
+  activeOverlay?._closeRecordModal?.();
+});
+
 function escapeHtml(str = "") {
   return str
     .replace(/&/g, "&amp;")

@@ -658,10 +658,36 @@ html[data-theme="light"] .icon-moon { display: block; }
 .person-modal-head h3 { margin: 0; font-size: 1.12rem; }
 .person-modal-head p { margin: 0.2rem 0 0; color: var(--ink-muted); font-size: 0.78rem; }
 .person-modal-head .icon-btn { flex-shrink: 0; font-size: 1.25rem; }
+.record-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 170;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(8, 6, 16, 0.72);
+  backdrop-filter: blur(8px);
+}
+.record-modal {
+  width: min(720px, 96vw);
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 1.2rem;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45), 0 0 40px var(--primary-soft);
+}
+.record-modal-wide { width: min(1080px, 96vw); }
+.record-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--border); }
+.record-modal-head h3 { margin: 0; font-size: 1.12rem; }
+.record-modal-head p { margin: 0.2rem 0 0; color: var(--ink-muted); font-size: 0.78rem; }
+.record-modal-head .icon-btn { flex-shrink: 0; font-size: 1.25rem; }
 
 @media (max-width: 620px) {
   .person-modal-overlay { align-items: end; padding: 0; }
   .person-modal { width: 100%; max-height: 92vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1rem; }
+  .record-modal-overlay { align-items: end; padding: 0; }
+  .record-modal, .record-modal-wide { width: 100%; max-height: 92vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1rem; }
 }
 
 /* ---------------- Anexos (Diário: imagens e arquivos) ---------------- */
