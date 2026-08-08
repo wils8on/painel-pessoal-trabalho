@@ -1499,20 +1499,24 @@ function openPerson(id) { const item = birthdayItems.find((entry) => entry.id ==
 function renderPeople() { if (!$("#pessoa-list")) return; const search = $("#pessoa-search").value.toLowerCase(), category = $("#pessoa-filter-category").value, today = new Date(); const people = birthdayItems.filter((item) => !category || (item.category || "Contatos") === category).filter((item) => !search || `${item.name} ${item.email || ""} ${item.company || ""} ${item.role || ""}`.toLowerCase().includes(search)); $("#pessoa-empty").classList.toggle("hidden", people.length > 0); $("#pessoa-list").innerHTML = people.map((item) => { const last = item.lastContact ? new Date(item.lastContact + "T00:00:00") : null; const days = last ? Math.floor((today-last)/86400000) : null; const due = days === null || days >= (item.contactFrequencyDays || 30); return `<article class="person-card glass-card"><div class="person-head">${item.photoUrl ? `<img src="${escapeHtml(item.photoUrl)}" alt=""/>` : `<span class="person-avatar">${escapeHtml(item.name.charAt(0))}</span>`}<div><h3>${escapeHtml(item.name)}</h3><span>${escapeHtml(item.category || "Contatos")}</span></div>${due ? `<b class="contact-due">Contato pendente</b>` : ""}</div><p class="entry-meta"><span>🎂 ${fmtDayMonth(item.day,item.month)}</span>${item.company ? `<span>${escapeHtml(item.company)}${item.role ? ` · ${escapeHtml(item.role)}` : ""}</span>` : ""}</p>${item.email ? `<a href="mailto:${escapeHtml(item.email)}">${escapeHtml(item.email)}</a>` : ""}${item.phone ? `<a href="tel:${escapeHtml(item.phone)}">${escapeHtml(item.phone)}</a>` : ""}${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ""}<div class="person-actions"><button data-person-contact="${item.id}">Registrar contato</button><button data-person-edit="${item.id}">Editar</button></div></article>`; }).join(""); $$("[data-person-edit]").forEach((btn) => btn.addEventListener("click", () => openPerson(btn.dataset.personEdit))); $$("[data-person-contact]").forEach((btn) => btn.addEventListener("click", async () => { const item = birthdayItems.find((entry) => entry.id === btn.dataset.personContact); const now = new Date().toISOString(); await birthdaysApi.update(item.id, { lastContact: now.slice(0,10), interactions: [...(item.interactions || []), { date: now, note: "Contato registrado" }] }); showToast("Interação registrada."); })); }
 $("#pessoa-search").addEventListener("input", renderPeople); $("#pessoa-filter-category").addEventListener("change", renderPeople);
 
-$("#evento-new-btn").addEventListener("click", () => {
+function startNewEvent(date = "") {
   $("#evento-edit-id").value = "";
   $("#evento-title").value = "";
-  $("#evento-date").value = "";
+  $("#evento-date").value = date;
+  $("#evento-time").value = "";
   $("#evento-notes").value = "";
   eventoForm.classList.remove("hidden");
-});
+  $("#evento-title").focus();
+}
+
+$("#evento-new-btn").addEventListener("click", () => startNewEvent());
 $("#evento-cancel-btn").addEventListener("click", () => eventoForm.classList.add("hidden"));
 
 $("#evento-save-btn").addEventListener("click", async () => {
   const title = $("#evento-title").value.trim();
   const date = $("#evento-date").value;
   if (!title || !date) return showToast("Preencha título e data do evento.", "error");
-  const payload = { title, date, notes: $("#evento-notes").value.trim() };
+  const payload = { title, date, time: $("#evento-time").value || null, notes: $("#evento-notes").value.trim() };
   const editId = $("#evento-edit-id").value;
   try {
     if (editId) await eventsApi.update(editId, payload);
@@ -1525,9 +1529,15 @@ $("#evento-save-btn").addEventListener("click", async () => {
   }
 });
 
+function eventDateTime(item) {
+  return new Date(`${item.date}T${item.time || "23:59"}:00`);
+}
+
 function upcomingEvents() {
-  const todayStr = new Date().toISOString().slice(0, 10);
-  return eventItems.filter((i) => i.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date));
+  const now = new Date();
+  return eventItems
+    .filter((item) => item.date && eventDateTime(item) >= now)
+    .sort((a, b) => eventDateTime(a) - eventDateTime(b));
 }
 
 function openEventEntry(id) {
@@ -1537,6 +1547,7 @@ function openEventEntry(id) {
   $("#evento-edit-id").value = item.id;
   $("#evento-title").value = item.title;
   $("#evento-date").value = item.date;
+  $("#evento-time").value = item.time || "";
   $("#evento-notes").value = item.notes || "";
   eventoForm.classList.remove("hidden");
 }
@@ -1550,7 +1561,7 @@ function renderEvents(items) {
     <div class="list-item">
       <div class="list-item-main">
         <span class="list-item-title">${escapeHtml(item.title)}</span>
-        <span class="list-item-date">${fmtDate(new Date(item.date + "T00:00:00"))}</span>
+        <span class="list-item-date">${fmtDate(new Date(item.date + "T00:00:00"))}${item.time ? ` · ${item.time}` : " · sem horário"}</span>
       </div>
       <div class="list-item-actions">
         <button data-action="edit" data-id="${item.id}">Editar</button>
@@ -1813,15 +1824,15 @@ function refreshDashboard() {
   const projectDeadlines = projectItems
     .filter((i) => i.deadline && i.status !== "Concluido")
     .map((i) => ({ title: i.title, date: i.deadline, overdue: i.deadline < todayStr, kind: "Projeto" }));
-  const eventDeadlines = upcomingEvents().map((i) => ({ title: i.title, date: i.date, overdue: false, kind: "Evento" }));
-  const deadlines = [...projectDeadlines, ...eventDeadlines].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
+  const eventDeadlines = upcomingEvents().map((i) => ({ title: i.title, date: i.date, time: i.time, overdue: false, kind: "Evento" }));
+  const deadlines = [...projectDeadlines, ...eventDeadlines].sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`)).slice(0, 6);
 
   $("#dash-deadlines-empty").classList.toggle("hidden", deadlines.length > 0);
   $("#dash-deadlines-list").innerHTML = deadlines.map((item) => `
     <div class="list-item">
       <div class="list-item-main">
         <span class="list-item-title">${escapeHtml(item.title)}</span>
-        <span class="list-item-date">${item.kind} · ${fmtDate(new Date(item.date + "T00:00:00"))}</span>
+        <span class="list-item-date">${item.kind} · ${fmtDate(new Date(item.date + "T00:00:00"))}${item.time ? ` às ${item.time}` : ""}</span>
       </div>
       ${item.overdue ? `<span class="badge badge-overdue">Atrasado</span>` : ""}
     </div>
@@ -2083,16 +2094,15 @@ function renderAtividade() {
 ========================================================= */
 function buildDailyBrief() {
   const items = [];
-  const todayStr = new Date().toISOString().slice(0, 10);
 
   // Demandas pendentes
   const todoCount = kanbanItems.filter((i) => (i.status || "todo") === "todo").length;
   const doingCount = kanbanItems.filter((i) => i.status === "doing").length;
   const totalOpen = todoCount + doingCount;
   if (totalOpen > 0) {
-    items.push({ icon: "📋", text: `Você tem <strong>${totalOpen} demanda(s)</strong> em aberto (${todoCount} para fazer, ${doingCount} em progresso).` });
+    items.push({ icon: "📋", priority: 8, text: `Você tem <strong>${totalOpen} demanda(s)</strong> em aberto (${todoCount} para fazer, ${doingCount} em progresso).` });
   } else {
-    items.push({ icon: "✅", text: "Nenhuma demanda pendente no momento." });
+    items.push({ icon: "✅", priority: 5, text: "Nenhuma demanda pendente no momento." });
   }
 
   // Projetos parados: status "Pausado" ou sem atualização de progresso há 14+ dias
@@ -2108,38 +2118,56 @@ function buildDailyBrief() {
   });
   if (stalledProjects.length) {
     const names = stalledProjects.slice(0, 3).map((p) => p.title).join(", ");
-    items.push({ icon: "⏸️", text: `<strong>${stalledProjects.length} projeto(s)</strong> parado(s) há um tempo: ${escapeHtml(names)}${stalledProjects.length > 3 ? "…" : ""}.` });
+    items.push({ icon: "⏸️", priority: 9, text: `<strong>${stalledProjects.length} projeto(s)</strong> parado(s) há um tempo: ${escapeHtml(names)}${stalledProjects.length > 3 ? "…" : ""}.` });
   }
 
   // Próximo aniversário
   const nextBday = upcomingBirthdays(1)[0];
   if (nextBday) {
     items.push(nextBday.isToday
-      ? { icon: "🎉", text: `Hoje é aniversário de <strong>${escapeHtml(nextBday.name)}</strong>!` }
-      : { icon: "🎂", text: `Faltam <strong>${nextBday.daysLeft} dia(s)</strong> para o aniversário de ${escapeHtml(nextBday.name)}.` });
+      ? { icon: "🎉", priority: 9, text: `Hoje é aniversário de <strong>${escapeHtml(nextBday.name)}</strong>!` }
+      : { icon: "🎂", priority: nextBday.daysLeft <= 7 ? 7 : 3, text: `Faltam <strong>${nextBday.daysLeft} dia(s)</strong> para o aniversário de ${escapeHtml(nextBday.name)}.` });
   }
 
   // Próximo prazo (projeto ou evento)
-  const projectDeadlines = projectItems.filter((p) => p.deadline && p.status !== "Concluido").map((p) => ({ title: p.title, date: p.deadline, kind: "projeto" }));
-  const eventDeadlines = upcomingEvents().map((e) => ({ title: e.title, date: e.date, kind: "evento" }));
-  const nextDeadline = [...projectDeadlines, ...eventDeadlines].sort((a, b) => a.date.localeCompare(b.date))[0];
+  const projectDeadlines = projectItems.filter((p) => p.deadline && p.status !== "Concluido").map((p) => ({ title: p.title, date: p.deadline, time: null, kind: "projeto" }));
+  const eventDeadlines = upcomingEvents().map((e) => ({ title: e.title, date: e.date, time: e.time, kind: "evento" }));
+  const nextDeadline = [...projectDeadlines, ...eventDeadlines].sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`))[0];
   if (nextDeadline) {
-    const days = Math.round((new Date(nextDeadline.date + "T00:00:00") - new Date(todayStr + "T00:00:00")) / 86400000);
-    const when = days === 0 ? "hoje" : days === 1 ? "amanhã" : `em ${days} dia(s)`;
-    items.push({ icon: "⏰", text: `Próximo prazo: <strong>${escapeHtml(nextDeadline.title)}</strong> (${nextDeadline.kind}) ${when}.` });
+    const deadlineAt = new Date(`${nextDeadline.date}T${nextDeadline.time || "23:59"}:00`);
+    const minutes = Math.ceil((deadlineAt - new Date()) / 60000);
+    let when;
+    if (nextDeadline.time) {
+      const days = Math.floor(minutes / 1440);
+      if (minutes < 0) when = "está atrasado";
+      else if (minutes < 60) when = `vence em ${minutes} min`;
+      else if (minutes < 1440) when = `vence em ${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}min` : ""}`;
+      else if (days === 1) when = `é amanhã às ${nextDeadline.time}`;
+      else when = `é em ${days} dias, às ${nextDeadline.time}`;
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDay = new Date(`${nextDeadline.date}T00:00:00`);
+      const days = Math.round((dueDay - today) / 86400000);
+      if (days < 0) when = "está atrasado";
+      else if (days === 0) when = nextDeadline.kind === "evento" ? "é hoje (sem horário)" : "vence hoje";
+      else if (days === 1) when = "é amanhã";
+      else when = `é em ${days} dias`;
+    }
+    items.push({ icon: "⏰", priority: 10, text: `Próximo prazo: <strong>${escapeHtml(nextDeadline.title)}</strong> (${nextDeadline.kind}) ${when}.` });
   }
 
   // Última anotação do diário
   const lastDiary = [...diaryItems].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))[0];
   if (lastDiary) {
     const ts = tsToDate(lastDiary.updatedAt) || tsToDate(lastDiary.createdAt);
-    items.push({ icon: "📓", text: `Sua última anotação no diário foi <strong>${relativeTime(ts)}</strong>: "${escapeHtml(lastDiary.title)}".` });
+    items.push({ icon: "📓", priority: 1, text: `Sua última anotação no diário foi <strong>${relativeTime(ts)}</strong>: "${escapeHtml(lastDiary.title)}".` });
   }
 
   // Última observação AH/SD
   const lastAhsd = [...ahsdItems].sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime))[0];
   if (lastAhsd) {
-    items.push({ icon: "🧠", text: `Última observação AH/SD registrada <strong>${relativeTime(new Date(lastAhsd.dateTime))}</strong>.` });
+    items.push({ icon: "🧠", priority: 1, text: `Última observação AH/SD registrada <strong>${relativeTime(new Date(lastAhsd.dateTime))}</strong>.` });
   }
 
   // Sugestão automática de prioridade
@@ -2153,21 +2181,31 @@ function buildDailyBrief() {
   } else {
     suggestion = "Tudo em dia por aqui! Bom momento para registrar uma ideia no diário ou planejar o próximo projeto.";
   }
-  items.push({ icon: "💡", text: suggestion, suggestion: true });
+  items.push({ icon: "💡", priority: 6, text: suggestion, suggestion: true });
 
-  return items;
+  return items.sort((a, b) => (b.priority || 0) - (a.priority || 0));
 }
 
+let dailyBriefExpanded = false;
 function renderDailyBrief() {
   if (!currentUser) return;
   const items = buildDailyBrief();
-  $("#daily-brief-list").innerHTML = items.map((i) => `
+  const visibleItems = dailyBriefExpanded ? items : items.slice(0, 4);
+  $("#daily-brief-list").innerHTML = visibleItems.map((i) => `
     <div class="brief-item ${i.suggestion ? "brief-suggestion" : ""}">
       <span class="brief-icon">${i.icon}</span>
       <span class="brief-text">${i.text}</span>
     </div>
   `).join("");
+  const toggle = $("#daily-brief-toggle");
+  toggle.classList.toggle("hidden", items.length <= 4);
+  toggle.textContent = dailyBriefExpanded ? "Ver menos" : `Ver tudo (${items.length})`;
 }
+
+$("#daily-brief-toggle").addEventListener("click", () => {
+  dailyBriefExpanded = !dailyBriefExpanded;
+  renderDailyBrief();
+});
 
 /* =========================================================
    BUSCA GLOBAL (Ctrl+K) — estilo Notion/VSCode
@@ -2348,14 +2386,17 @@ function getDayInfo(dateObj) {
 function renderDayDetailsPanel(dateObj, info) {
   const panel = $("#cal-day-details");
   const total = info.events.length + info.bdays.length + info.deadlines.length;
-  if (!total) { panel.innerHTML = ""; return; }
   const rows = [
-    ...info.events.map((e) => ({ color: "var(--rust)", label: "Evento", text: e.title })),
+    ...info.events.map((e) => ({ color: "var(--rust)", label: e.time ? `Evento · ${e.time}` : "Evento · sem horário", text: e.title })),
     ...info.bdays.map((b) => ({ color: "var(--plum)", label: "Aniversário", text: `${b.name} 🎂` })),
     ...info.deadlines.map((p) => ({ color: "var(--teal)", label: "Prazo", text: p.title })),
   ];
   panel.innerHTML = `
-    <p class="cal-day-details-title">${fmtDate(dateObj)}</p>
+    <div class="cal-day-details-head">
+      <p class="cal-day-details-title">${fmtDate(dateObj)}</p>
+      <button type="button" class="btn btn-primary btn-sm" id="cal-create-event">+ Criar evento</button>
+    </div>
+    ${total ? "" : `<p class="cal-day-empty">Nenhum compromisso nesta data. Deseja planejar algo?</p>`}
     ${rows.map((r) => `
       <div class="cal-day-detail-item">
         <span class="cal-dot" style="background:${r.color}"></span>
@@ -2364,6 +2405,10 @@ function renderDayDetailsPanel(dateObj, info) {
       </div>
     `).join("")}
   `;
+  $("#cal-create-event").addEventListener("click", () => {
+    switchView("agenda");
+    startNewEvent(ymd(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
+  });
 }
 
 function renderCalendar() {
@@ -2400,18 +2445,22 @@ function renderCalendar() {
     ];
 
     cellsHtml += `
-      <div class="cal-day ${otherMonth ? "other-month" : ""} ${isToday ? "today" : ""} ${isSelected ? "selected" : ""} ${hasEvents ? "has-events" : ""}"
+      <button type="button" class="cal-day ${otherMonth ? "other-month" : ""} ${isToday ? "today" : ""} ${isSelected ? "selected" : ""} ${hasEvents ? "has-events" : ""}"
            data-date="${cellStr}" ${titleParts.length ? `title="${escapeHtml(titleParts.join(" · "))}"` : ""}>
         <span>${cellDate.getDate()}</span>
         <span class="cal-day-dots">${dots}</span>
-      </div>
+      </button>
     `;
   }
   $("#cal-grid").innerHTML = cellsHtml;
 
-  $$(".cal-day.has-events", $("#cal-grid")).forEach((cell) => {
+  $$(".cal-day", $("#cal-grid")).forEach((cell) => {
     cell.addEventListener("click", () => {
       selectedCalendarDay = cell.dataset.date;
+      const [selectedYear, selectedMonth] = selectedCalendarDay.split("-").map(Number);
+      if (selectedYear !== year || selectedMonth - 1 !== month) {
+        calendarViewDate = new Date(selectedYear, selectedMonth - 1, 1);
+      }
       renderCalendar();
     });
   });

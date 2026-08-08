@@ -135,7 +135,10 @@
       <div class="glass-card daily-brief-card">
         <div class="glass-card-head daily-brief-head">
           <h3>Resumo do Dia</h3>
-          <span class="daily-brief-tag">seu assistente pessoal</span>
+          <div class="daily-brief-actions">
+            <span class="daily-brief-tag">prioridades de hoje</span>
+            <button type="button" class="btn btn-ghost btn-sm hidden" id="daily-brief-toggle">Ver tudo</button>
+          </div>
         </div>
         <div id="daily-brief-list" class="daily-brief-list"></div>
       </div>
@@ -207,7 +210,7 @@
           <div id="dash-activity-list" class="activity-list"></div>
           <p class="empty-state small" id="dash-activity-empty">Assim que você começar a usar o Nova, as novidades aparecem aqui.</p>
         </div>
-        <div class="glass-card dash-card dash-card-span2" id="dash-productivity-widget"><div class="glass-card-head"><h3>Produtividade · 16 semanas</h3></div><div id="dash-productivity-heatmap" class="productivity-heatmap"></div><p id="dash-productivity-caption" class="ring-caption"></p></div>
+        <div class="glass-card dash-card dash-card-span2 dash-card-full" id="dash-productivity-widget"><div class="glass-card-head"><h3>Produtividade · 16 semanas</h3></div><div id="dash-productivity-heatmap" class="productivity-heatmap"></div><p id="dash-productivity-caption" class="ring-caption"></p></div>
       </div>
     </section>
 
@@ -616,7 +619,10 @@
           <div id="evento-form-wrap" class="form-card hidden">
             <input type="hidden" id="evento-edit-id" />
             <input type="text" id="evento-title" class="input" placeholder="Título do evento" />
-            <input type="date" id="evento-date" class="input mono" />
+            <div class="form-row-2">
+              <input type="date" id="evento-date" class="input mono" aria-label="Data do evento" />
+              <input type="time" id="evento-time" class="input mono" aria-label="Horário do evento" />
+            </div>
             <textarea id="evento-notes" class="input textarea" rows="3" placeholder="Notas (opcional)"></textarea>
             <div class="form-actions">
               <button class="btn btn-ghost" id="evento-cancel-btn">Cancelar</button>
