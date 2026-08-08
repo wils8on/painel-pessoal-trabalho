@@ -630,6 +630,10 @@ html[data-theme="light"] .icon-moon { display: block; }
 .image-upload-status { display: block; font-size: 0.76rem; color: var(--ink-faint); margin-top: 0.4rem; }
 .image-preview-wrap { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.6rem; }
 .image-preview { width: 96px; height: 72px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.person-photo-upload { margin: 0.2rem 0 0.8rem; }
+.person-photo-upload .image-upload-label:hover { border-color: var(--rust); }
+.person-photo-preview-wrap { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.65rem; }
+.person-photo-preview { width: 72px; height: 72px; object-fit: cover; border-radius: 50%; border: 2px solid var(--rust); }
 
 /* ---------------- Anexos (Diário: imagens e arquivos) ---------------- */
 .attachments-field { margin-bottom: 0.8rem; }

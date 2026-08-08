@@ -1478,6 +1478,54 @@ const eventoForm = $("#evento-form-wrap");
 const niverForm = $("#niver-form-wrap");
 let pessoaProjectLinks = [], pessoaTaskLinks = [];
 
+const pessoaPhotoInput = $("#pessoa-photo");
+pessoaPhotoInput.type = "hidden";
+pessoaPhotoInput.parentElement.classList.remove("form-row-3");
+pessoaPhotoInput.parentElement.classList.add("form-row-2");
+pessoaPhotoInput.parentElement.insertAdjacentHTML("afterend", `
+  <div class="person-photo-upload image-upload">
+    <label class="image-upload-label" for="pessoa-photo-file">📷 Escolher foto do computador</label>
+    <input type="file" id="pessoa-photo-file" accept="image/*" class="image-upload-input" />
+    <span class="image-upload-status" id="pessoa-photo-status"></span>
+    <div id="pessoa-photo-preview-wrap" class="person-photo-preview-wrap hidden">
+      <img id="pessoa-photo-preview" class="person-photo-preview" alt="Prévia da foto" />
+      <button type="button" class="btn btn-ghost btn-sm" id="pessoa-photo-remove">Remover foto</button>
+    </div>
+  </div>
+`);
+
+function renderPessoaPhotoPreview(url = "") {
+  pessoaPhotoInput.value = url;
+  $("#pessoa-photo-preview").src = url;
+  $("#pessoa-photo-preview-wrap").classList.toggle("hidden", !url);
+}
+
+$("#pessoa-photo-file").addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    showToast("Escolha um arquivo de imagem.", "error");
+    event.target.value = "";
+    return;
+  }
+  const status = $("#pessoa-photo-status");
+  status.textContent = "Enviando foto…";
+  try {
+    const result = await uploadFileToCloudinary(file);
+    renderPessoaPhotoPreview(result.url);
+    status.textContent = "Foto enviada ✓";
+  } catch (err) {
+    console.error(err);
+    status.textContent = "";
+    showToast(err.message || "Não foi possível enviar a foto.", "error");
+  } finally {
+    event.target.value = "";
+    setTimeout(() => { status.textContent = ""; }, 2500);
+  }
+});
+
+$("#pessoa-photo-remove").addEventListener("click", () => renderPessoaPhotoPreview());
+
 function populateDaySelect() {
   const select = $("#niver-day");
   if (select.options.length) return;
@@ -1492,10 +1540,10 @@ function populateDaySelect() {
 
 function renderPessoaLinks() { const groups = [["#pessoa-projects", projectItems, pessoaProjectLinks], ["#pessoa-tasks", kanbanItems, pessoaTaskLinks]]; groups.forEach(([selector, items, selected]) => { $(selector).innerHTML = items.length ? items.map((item) => `<button type="button" class="tag-toggle ${selected.includes(item.id) ? "active" : ""}" data-id="${item.id}">${escapeHtml(item.title)}</button>`).join("") : `<span class="project-editor-empty">Nenhum item disponível.</span>`; }); }
 [["#pessoa-projects", "project"], ["#pessoa-tasks", "task"]].forEach(([selector, type]) => $(selector).addEventListener("click", (event) => { const btn = event.target.closest(".tag-toggle"); if (!btn) return; const current = type === "project" ? pessoaProjectLinks : pessoaTaskLinks; const next = current.includes(btn.dataset.id) ? current.filter((id) => id !== btn.dataset.id) : [...current, btn.dataset.id]; if (type === "project") pessoaProjectLinks = next; else pessoaTaskLinks = next; renderPessoaLinks(); }));
-function resetPessoaForm() { $("#pessoa-id").value = ""; ["name","email","phone","photo","company","role","last-contact","social","notes"].forEach((field) => $(`#pessoa-${field}`).value = ""); $("#pessoa-category").value = "Amigos"; $("#pessoa-day").value = "1"; $("#pessoa-month").value = "1"; $("#pessoa-frequency").value = 30; pessoaProjectLinks = []; pessoaTaskLinks = []; renderPessoaLinks(); }
+function resetPessoaForm() { $("#pessoa-id").value = ""; ["name","email","phone","company","role","last-contact","social","notes"].forEach((field) => $(`#pessoa-${field}`).value = ""); renderPessoaPhotoPreview(); $("#pessoa-category").value = "Amigos"; $("#pessoa-day").value = "1"; $("#pessoa-month").value = "1"; $("#pessoa-frequency").value = 30; pessoaProjectLinks = []; pessoaTaskLinks = []; renderPessoaLinks(); }
 $("#pessoa-new-btn").addEventListener("click", () => { resetPessoaForm(); $("#pessoa-form").classList.remove("hidden"); }); $("#pessoa-cancel").addEventListener("click", () => $("#pessoa-form").classList.add("hidden"));
 $("#pessoa-save").addEventListener("click", async () => { const name = $("#pessoa-name").value.trim(); if (!name) return showToast("Informe o nome.", "error"); const id = $("#pessoa-id").value; const existing = id ? birthdayItems.find((item) => item.id === id) : null; const payload = { name, day: Number($("#pessoa-day").value), month: Number($("#pessoa-month").value), category: $("#pessoa-category").value, email: $("#pessoa-email").value.trim(), phone: $("#pessoa-phone").value.trim(), photoUrl: safeProjectUrl($("#pessoa-photo").value), company: $("#pessoa-company").value.trim(), role: $("#pessoa-role").value.trim(), contactFrequencyDays: Number($("#pessoa-frequency").value) || 30, lastContact: $("#pessoa-last-contact").value || null, socialUrl: safeProjectUrl($("#pessoa-social").value), notes: $("#pessoa-notes").value.trim(), linkedProjectIds: pessoaProjectLinks, linkedTaskIds: pessoaTaskLinks, interactions: existing?.interactions || [] }; if (id) await birthdaysApi.update(id, payload); else await birthdaysApi.add(currentUser.uid, payload); $("#pessoa-form").classList.add("hidden"); showToast("Pessoa salva."); });
-function openPerson(id) { const item = birthdayItems.find((entry) => entry.id === id); if (!item) return; switchView("pessoas"); $("#pessoa-id").value = item.id; $("#pessoa-name").value = item.name; $("#pessoa-category").value = item.category || "Contatos"; $("#pessoa-email").value = item.email || ""; $("#pessoa-phone").value = item.phone || ""; $("#pessoa-photo").value = item.photoUrl || ""; $("#pessoa-company").value = item.company || ""; $("#pessoa-role").value = item.role || ""; $("#pessoa-day").value = item.day; $("#pessoa-month").value = item.month; $("#pessoa-frequency").value = item.contactFrequencyDays || 30; $("#pessoa-last-contact").value = item.lastContact || ""; $("#pessoa-social").value = item.socialUrl || ""; $("#pessoa-notes").value = item.notes || ""; pessoaProjectLinks = [...(item.linkedProjectIds || [])]; pessoaTaskLinks = [...(item.linkedTaskIds || [])]; renderPessoaLinks(); $("#pessoa-form").classList.remove("hidden"); }
+function openPerson(id) { const item = birthdayItems.find((entry) => entry.id === id); if (!item) return; switchView("pessoas"); $("#pessoa-id").value = item.id; $("#pessoa-name").value = item.name; $("#pessoa-category").value = item.category || "Contatos"; $("#pessoa-email").value = item.email || ""; $("#pessoa-phone").value = item.phone || ""; renderPessoaPhotoPreview(item.photoUrl || ""); $("#pessoa-company").value = item.company || ""; $("#pessoa-role").value = item.role || ""; $("#pessoa-day").value = item.day; $("#pessoa-month").value = item.month; $("#pessoa-frequency").value = item.contactFrequencyDays || 30; $("#pessoa-last-contact").value = item.lastContact || ""; $("#pessoa-social").value = item.socialUrl || ""; $("#pessoa-notes").value = item.notes || ""; pessoaProjectLinks = [...(item.linkedProjectIds || [])]; pessoaTaskLinks = [...(item.linkedTaskIds || [])]; renderPessoaLinks(); $("#pessoa-form").classList.remove("hidden"); }
 function renderPeople() { if (!$("#pessoa-list")) return; const search = $("#pessoa-search").value.toLowerCase(), category = $("#pessoa-filter-category").value, today = new Date(); const people = birthdayItems.filter((item) => !category || (item.category || "Contatos") === category).filter((item) => !search || `${item.name} ${item.email || ""} ${item.company || ""} ${item.role || ""}`.toLowerCase().includes(search)); $("#pessoa-empty").classList.toggle("hidden", people.length > 0); $("#pessoa-list").innerHTML = people.map((item) => { const last = item.lastContact ? new Date(item.lastContact + "T00:00:00") : null; const days = last ? Math.floor((today-last)/86400000) : null; const due = days === null || days >= (item.contactFrequencyDays || 30); return `<article class="person-card glass-card"><div class="person-head">${item.photoUrl ? `<img src="${escapeHtml(item.photoUrl)}" alt=""/>` : `<span class="person-avatar">${escapeHtml(item.name.charAt(0))}</span>`}<div><h3>${escapeHtml(item.name)}</h3><span>${escapeHtml(item.category || "Contatos")}</span></div>${due ? `<b class="contact-due">Contato pendente</b>` : ""}</div><p class="entry-meta"><span>🎂 ${fmtDayMonth(item.day,item.month)}</span>${item.company ? `<span>${escapeHtml(item.company)}${item.role ? ` · ${escapeHtml(item.role)}` : ""}</span>` : ""}</p>${item.email ? `<a href="mailto:${escapeHtml(item.email)}">${escapeHtml(item.email)}</a>` : ""}${item.phone ? `<a href="tel:${escapeHtml(item.phone)}">${escapeHtml(item.phone)}</a>` : ""}${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ""}<div class="person-actions"><button data-person-contact="${item.id}">Registrar contato</button><button data-person-edit="${item.id}">Editar</button></div></article>`; }).join(""); $$("[data-person-edit]").forEach((btn) => btn.addEventListener("click", () => openPerson(btn.dataset.personEdit))); $$("[data-person-contact]").forEach((btn) => btn.addEventListener("click", async () => { const item = birthdayItems.find((entry) => entry.id === btn.dataset.personContact); const now = new Date().toISOString(); await birthdaysApi.update(item.id, { lastContact: now.slice(0,10), interactions: [...(item.interactions || []), { date: now, note: "Contato registrado" }] }); showToast("Interação registrada."); })); }
 $("#pessoa-search").addEventListener("input", renderPeople); $("#pessoa-filter-category").addEventListener("change", renderPeople);
 
