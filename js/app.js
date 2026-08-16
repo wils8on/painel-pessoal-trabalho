@@ -329,6 +329,51 @@ const diaryAttachmentsList = $("#diario-attachments-list");
 let diaryAttachmentsDraft = []; // [{url, name, format, resourceType, bytes}]
 let diaryLinkedProjects = [], diaryLinkedGoals = [], diaryLinkedHabits = [];
 let diaryLiteraryLinks = [];
+const diaryDetailOverlay = document.createElement("div");
+diaryDetailOverlay.id = "diary-detail-overlay";
+diaryDetailOverlay.className = "record-modal-overlay diary-detail-overlay hidden";
+diaryDetailOverlay.innerHTML = `<article class="glass-card diary-detail-modal" role="dialog" aria-modal="true" aria-labelledby="diary-detail-title"></article>`;
+document.body.appendChild(diaryDetailOverlay);
+
+function closeDiaryDetail() {
+  diaryDetailOverlay.classList.add("hidden");
+  if (!$(".record-modal-overlay:not(.hidden), .person-modal-overlay:not(.hidden)")) document.body.classList.remove("modal-open");
+}
+
+function openDiaryDetail(id) {
+  const item = diaryItems.find((entry) => entry.id === id);
+  if (!item) return;
+  const attachments = item.attachments || [];
+  const images = attachments.filter((attachment) => attachment.resourceType === "image");
+  const files = attachments.filter((attachment) => attachment.resourceType !== "image");
+  const relations = [
+    ...(item.linkedProjectIds || []).map((relationId) => ({ type: "projeto", item: projectItems.find((entry) => entry.id === relationId) })),
+    ...(item.linkedGoalIds || []).map((relationId) => ({ type: "meta", item: goalItems.find((entry) => entry.id === relationId) })),
+    ...(item.linkedHabitIds || []).map((relationId) => ({ type: "habito", item: habitItems.find((entry) => entry.id === relationId) })),
+  ].filter((relation) => relation.item);
+  const timestamp = tsToDate(item.updatedAt) || tsToDate(item.createdAt);
+  $(".diary-detail-modal", diaryDetailOverlay).innerHTML = `
+    <div class="record-modal-head">
+      <div><span class="entry-tag" style="background:var(--amber-soft);color:var(--amber)">${escapeHtml(item.category || "Anotação")}</span><h3 id="diary-detail-title">${escapeHtml(item.title)}</h3><p>${timestamp ? `Atualizado ${relativeTime(timestamp)}` : ""}${item.book ? ` · ${escapeHtml(item.book)}` : ""}</p></div>
+      <button type="button" class="icon-btn" data-diary-detail-action="close" aria-label="Fechar">×</button>
+    </div>
+    ${(item.mood || item.energy != null || item.sleepHours || item.location || item.weather) ? `<div class="diary-context-chips">${item.mood ? `<span>☺ ${escapeHtml(item.mood)}</span>` : ""}${item.energy != null ? `<span>⚡ ${item.energy}/5</span>` : ""}${item.sleepHours ? `<span>☾ ${item.sleepHours}h</span>` : ""}${item.location ? `<span>⌖ ${escapeHtml(item.location)}</span>` : ""}${item.weather ? `<span>☁ ${escapeHtml(item.weather)}</span>` : ""}</div>` : ""}
+    <div class="diary-detail-content entry-body">${mdToHtml(item.content)}</div>
+    ${images.length ? `<div class="diary-detail-gallery">${images.map((image) => `<a href="${escapeHtml(image.url)}" target="_blank" rel="noopener"><img src="${escapeHtml(image.url)}" alt="${escapeHtml(image.name)}"></a>`).join("")}</div>` : ""}
+    ${files.length ? `<div class="entry-files">${files.map((file) => `<a class="entry-file-chip" href="${escapeHtml(file.url)}" target="_blank" rel="noopener">${fileIconSvg()} ${escapeHtml(file.name)}</a>`).join("")}</div>` : ""}
+    ${(item.tags || []).length ? `<div class="entry-tags">${item.tags.map((tag) => `<span class="tag-chip">#${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+    ${relations.length ? `<div class="linked-chips">${relations.map((relation) => `<button class="linked-chip" data-diary-relation-type="${relation.type}" data-diary-relation-id="${relation.item.id}">↗ ${escapeHtml(relation.item.title)}</button>`).join("")}</div>` : ""}
+    <div class="form-actions"><button type="button" class="btn btn-ghost" data-diary-detail-action="close">Fechar</button><button type="button" class="btn btn-primary" data-accent="amber" data-diary-detail-action="edit">Editar anotação</button></div>
+  `;
+  diaryDetailOverlay.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  $$('[data-diary-detail-action="close"]', diaryDetailOverlay).forEach((button) => button.addEventListener("click", closeDiaryDetail));
+  $('[data-diary-detail-action="edit"]', diaryDetailOverlay).addEventListener("click", () => { closeDiaryDetail(); openDiaryEntry(item.id); });
+  $$('[data-diary-relation-id]', diaryDetailOverlay).forEach((button) => button.addEventListener("click", () => { closeDiaryDetail(); openActivityItem(button.dataset.diaryRelationType, button.dataset.diaryRelationId); }));
+}
+
+diaryDetailOverlay.addEventListener("click", (event) => { if (event.target === diaryDetailOverlay) closeDiaryDetail(); });
+diaryDetailOverlay._closeRecordModal = closeDiaryDetail;
 
 function renderDiaryLinks() {
   const groups = [["#diario-link-projects", projectItems || [], diaryLinkedProjects], ["#diario-link-goals", goalItems || [], diaryLinkedGoals], ["#diario-link-habits", habitItems || [], diaryLinkedHabits]];
@@ -485,7 +530,7 @@ function renderDiary(items) {
     const files = atts.filter((a) => a.resourceType !== "image");
     const diaryRelations = [...(item.linkedProjectIds || []).map((id) => ({ type: "project", item: projectItems.find((entry) => entry.id === id) })), ...(item.linkedGoalIds || []).map((id) => ({ type: "goal", item: goalItems.find((entry) => entry.id === id) })), ...(item.linkedHabitIds || []).map((id) => ({ type: "habit", item: habitItems.find((entry) => entry.id === id) }))].filter((relation) => relation.item);
     return `
-    <article class="entry-card">
+    <article class="entry-card diary-reading-card" data-view-id="${item.id}" tabindex="0" role="button" aria-label="Ler ${escapeHtml(item.title)}">
       <div class="entry-card-top">
         <span class="entry-tag" style="background:var(--amber-soft); color:var(--amber);">${escapeHtml(item.category)}</span>
         <span class="badge badge-status">${escapeHtml(item.status || "Rascunho")}</span>
@@ -500,6 +545,7 @@ function renderDiary(items) {
       ${(item.tags || []).length ? `<div class="entry-tags">${item.tags.map((t) => `<span class="tag-chip">#${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       ${diaryRelations.length ? `<div class="linked-chips">${diaryRelations.map((relation) => `<button class="linked-chip" data-action="open-link" data-type="${relation.type}" data-id="${relation.item.id}">${escapeHtml(relation.item.emoji || "↗")} ${escapeHtml(relation.item.title)}</button>`).join("")}</div>` : ""}
       <div class="entry-actions">
+        <button data-action="read" data-id="${item.id}">Ler</button>
         <button data-action="favorite" data-id="${item.id}">${item.favorite ? "Desfavoritar" : "Favoritar"}</button><button data-action="pin" data-id="${item.id}">${item.pinned ? "Desafixar" : "Fixar"}</button>
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
@@ -508,13 +554,19 @@ function renderDiary(items) {
   `;
   }).join("");
 
-  $$('#diario-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openDiaryEntry(btn.dataset.id)));
-  $$('#diario-list [data-action="favorite"]').forEach((btn) => btn.addEventListener("click", () => { const item = diaryItems.find((entry) => entry.id === btn.dataset.id); diaryApi.update(item.id, { favorite: !item.favorite }); }));
-  $$('#diario-list [data-action="pin"]').forEach((btn) => btn.addEventListener("click", () => { const item = diaryItems.find((entry) => entry.id === btn.dataset.id); diaryApi.update(item.id, { pinned: !item.pinned }); }));
-  $$('#diario-list [data-action="open-link"]').forEach((btn) => btn.addEventListener("click", () => { if (btn.dataset.type === "project") openProjectEntry(btn.dataset.id); else if (btn.dataset.type === "goal") openGoalEntry(btn.dataset.id); else openHabitEntry(btn.dataset.id); }));
-  $$('#diario-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
+  $$('#diario-list [data-action="read"]').forEach((btn) => btn.addEventListener("click", (event) => { event.stopPropagation(); openDiaryDetail(btn.dataset.id); }));
+  $$('#diario-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", (event) => { event.stopPropagation(); openDiaryEntry(btn.dataset.id); }));
+  $$('#diario-list [data-action="favorite"]').forEach((btn) => btn.addEventListener("click", (event) => { event.stopPropagation(); const item = diaryItems.find((entry) => entry.id === btn.dataset.id); diaryApi.update(item.id, { favorite: !item.favorite }); }));
+  $$('#diario-list [data-action="pin"]').forEach((btn) => btn.addEventListener("click", (event) => { event.stopPropagation(); const item = diaryItems.find((entry) => entry.id === btn.dataset.id); diaryApi.update(item.id, { pinned: !item.pinned }); }));
+  $$('#diario-list [data-action="open-link"]').forEach((btn) => btn.addEventListener("click", (event) => { event.stopPropagation(); if (btn.dataset.type === "project") openProjectEntry(btn.dataset.id); else if (btn.dataset.type === "goal") openGoalEntry(btn.dataset.id); else openHabitEntry(btn.dataset.id); }));
+  $$('#diario-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", (event) => {
+    event.stopPropagation();
     if (confirm("Excluir esta anotação?")) { diaryApi.remove(btn.dataset.id); showToast("Anotação excluída."); }
   }));
+  $$("#diario-list [data-view-id]").forEach((card) => {
+    card.addEventListener("click", (event) => { if (!event.target.closest("button, a")) openDiaryDetail(card.dataset.viewId); });
+    card.addEventListener("keydown", (event) => { if (event.target === card && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); openDiaryDetail(card.dataset.viewId); } });
+  });
 
   refreshDashboard();
   renderLiterary();
