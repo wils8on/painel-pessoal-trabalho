@@ -375,6 +375,7 @@
         <input type="search" id="kanban-search" class="input" placeholder="Buscar demandas…" />
         <select id="kanban-filter-priority" class="input select"><option value="">Todas as prioridades</option><option value="Baixa">Baixa</option><option value="Media">Média</option><option value="Alta">Alta</option><option value="Critica">Crítica</option></select>
         <select id="kanban-filter-label" class="input select"><option value="">Todas as etiquetas</option></select>
+        <button type="button" class="btn btn-ghost" id="kanban-archive-toggle">Arquivadas <span id="kanban-archive-count">0</span></button>
       </div>
 
       <div class="kanban-board">
@@ -391,6 +392,11 @@
           <div class="kanban-dropzone" id="col-done"></div>
         </div>
       </div>
+      <section class="glass-card kanban-archive hidden" id="kanban-archive">
+        <div class="glass-card-head"><h3>Demandas arquivadas</h3><span class="entry-meta">Histórico preservado para consulta</span></div>
+        <div id="kanban-archive-list" class="kanban-archive-list"></div>
+        <p id="kanban-archive-empty" class="empty-state small">Nenhuma demanda arquivada.</p>
+      </section>
     </section>
 
     <!-- VIEW 4 — Projetos & Planos -->

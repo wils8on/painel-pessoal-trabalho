@@ -721,6 +721,7 @@ function renderAhsd(items) {
 ========================================================= */
 let kanbanItems = [];
 const kanbanForm = $("#kanban-form-wrap");
+let kanbanArchiveVisible = false;
 
 $("#kanban-new-btn").addEventListener("click", () => {
   $("#kanban-edit-id").value = "";
@@ -742,7 +743,7 @@ $("#kanban-save-btn").addEventListener("click", async () => {
   const payload = { title, description: $("#kanban-desc").value.trim(), priority: $("#kanban-priority").value, effort: Number($("#kanban-effort").value), deadline: $("#kanban-deadline").value || null, labels: $("#kanban-labels").value.split(",").map((label) => label.trim()).filter(Boolean), context: $("#kanban-context").value.trim(), checklist, recurrence: $("#kanban-recurrence").value || null };
   try {
     if (editId) await kanbanApi.update(editId, payload);
-    else await kanbanApi.add(currentUser.uid, { ...payload, status: "todo" });
+    else await kanbanApi.add(currentUser.uid, { ...payload, status: "todo", archived: false, archivedAt: null });
     kanbanForm.classList.add("hidden");
     showToast(editId ? "Demanda atualizada." : "Demanda criada.");
   } catch (err) {
@@ -763,6 +764,39 @@ function openKanbanTask(id) {
   kanbanForm.classList.remove("hidden");
 }
 
+async function moveKanbanTask(id, status) {
+  const existing = kanbanItems.find((item) => item.id === id);
+  if (!existing) return;
+  await kanbanApi.update(id, { status, archived: false, archivedAt: null, completedAt: status === "done" ? (existing.completedAt || new Date().toISOString()) : null });
+  if (status === "done" && existing.recurrence && !existing.recurrenceGeneratedAt) {
+    const nextDeadline = nextRecurringDate(existing.deadline, existing.recurrence);
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, completedAt: _completedAt, status: _status, comments: _comments, recurrenceGeneratedAt: _generated, userId: _userId, archived: _archived, archivedAt: _archivedAt, ...copy } = existing;
+    await kanbanApi.add(currentUser.uid, { ...copy, title: existing.title, status: "todo", archived: false, archivedAt: null, deadline: nextDeadline, checklist: (existing.checklist || []).map((item) => ({ ...item, done: false })), comments: [] });
+    await kanbanApi.update(id, { recurrenceGeneratedAt: new Date().toISOString() });
+    showToast("Demanda concluída e próxima recorrência criada.");
+  } else {
+    showToast(status === "doing" ? "Demanda movida para Em Progresso." : status === "done" ? "Demanda concluída." : "Demanda restaurada.");
+  }
+}
+
+async function archiveKanbanTask(id) {
+  const item = kanbanItems.find((entry) => entry.id === id);
+  if (!item || item.status !== "done") return;
+  await kanbanApi.update(id, { archived: true, archivedAt: new Date().toISOString() });
+  showToast("Demanda arquivada. Ela continua disponível no histórico.");
+}
+
+async function restoreKanbanTask(id) {
+  await kanbanApi.update(id, { status: "done", archived: false, archivedAt: null });
+  showToast("Demanda restaurada para a coluna Concluído.");
+}
+
+$("#kanban-archive-toggle").addEventListener("click", () => {
+  kanbanArchiveVisible = !kanbanArchiveVisible;
+  $("#kanban-archive").classList.toggle("hidden", !kanbanArchiveVisible);
+  $("#kanban-archive-toggle").classList.toggle("active", kanbanArchiveVisible);
+});
+
 function renderKanban(items) {
   if (items) kanbanItems = items;
   const search = $("#kanban-search").value.toLowerCase();
@@ -773,11 +807,12 @@ function renderKanban(items) {
   labelSelect.innerHTML = `<option value="">Todas as etiquetas</option>${labels.map((label) => `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`).join("")}`; labelSelect.value = selectedLabel;
   const cols = { todo: [], doing: [], done: [] };
   [...kanbanItems]
+    .filter((item) => !item.archived)
     .filter((item) => !search || `${item.title} ${item.description || ""} ${(item.labels || []).join(" ")} ${item.context || ""}`.toLowerCase().includes(search))
     .filter((item) => !priorityFilter || (item.priority || "Media") === priorityFilter)
     .filter((item) => !labelFilter || (item.labels || []).includes(labelFilter))
     .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))
-    .forEach((item) => cols[item.status || "todo"].push(item));
+    .forEach((item) => (cols[item.status || "todo"] || cols.todo).push(item));
 
   ["todo", "doing", "done"].forEach((status) => {
     $(`#count-${status}`).textContent = cols[status].length;
@@ -793,10 +828,28 @@ function renderKanban(items) {
         <div class="kanban-card-actions">
           <button data-action="edit" data-id="${item.id}">Editar</button>
           <button data-action="delete" data-id="${item.id}">Excluir</button>
+          ${status === "todo" ? `<button class="kanban-next-action" data-action="advance" data-status="doing" data-id="${item.id}">Iniciar →</button>` : ""}
+          ${status === "doing" ? `<button class="kanban-next-action" data-action="advance" data-status="done" data-id="${item.id}">Concluir ✓</button>` : ""}
+          ${status === "done" ? `<button class="kanban-archive-action" data-action="archive" data-id="${item.id}">Arquivar</button>` : ""}
         </div>
       </div>
     `).join("");
   });
+  const archived = [...kanbanItems]
+    .filter((item) => item.archived)
+    .filter((item) => !search || `${item.title} ${item.description || ""} ${(item.labels || []).join(" ")} ${item.context || ""}`.toLowerCase().includes(search))
+    .filter((item) => !priorityFilter || (item.priority || "Media") === priorityFilter)
+    .filter((item) => !labelFilter || (item.labels || []).includes(labelFilter))
+    .sort((a, b) => new Date(b.archivedAt || b.completedAt || 0) - new Date(a.archivedAt || a.completedAt || 0));
+  $("#kanban-archive-count").textContent = kanbanItems.filter((item) => item.archived).length;
+  $("#kanban-archive").classList.toggle("hidden", !kanbanArchiveVisible);
+  $("#kanban-archive-empty").classList.toggle("hidden", archived.length > 0);
+  $("#kanban-archive-list").innerHTML = archived.map((item) => `
+    <article class="kanban-archive-item">
+      <div><strong>${escapeHtml(item.title)}</strong><div class="entry-meta"><span>Concluída ${item.completedAt ? relativeTime(new Date(item.completedAt)) : ""}</span>${item.archivedAt ? `<span>Arquivada ${relativeTime(new Date(item.archivedAt))}</span>` : ""}</div></div>
+      <div class="kanban-archive-actions"><button data-action="archive-edit" data-id="${item.id}">Consultar</button><button data-action="restore" data-id="${item.id}">Restaurar</button></div>
+    </article>
+  `).join("");
   $$('.kanban-card [data-action="check"]').forEach((input) => input.addEventListener("change", async (e) => { e.stopPropagation(); const task = kanbanItems.find((item) => item.id === input.dataset.id); const checklist = (task.checklist || []).map((check) => check.id === input.dataset.checkId ? { ...check, done: !check.done } : check); await kanbanApi.update(task.id, { checklist }); }));
   $$('.kanban-card [data-action="comment"]').forEach((btn) => btn.addEventListener("click", async (e) => { e.stopPropagation(); const input = $(`#kanban-comment-${btn.dataset.id}`); const text = input.value.trim(); if (!text) return; const task = kanbanItems.find((item) => item.id === btn.dataset.id); await kanbanApi.update(task.id, { comments: [...(task.comments || []), { id: projectDraftId(), text, author: currentUser.displayName || "Você", date: new Date().toISOString() }] }); }));
 
@@ -811,6 +864,10 @@ function renderKanban(items) {
     e.stopPropagation();
     if (confirm("Excluir esta demanda?")) { kanbanApi.remove(btn.dataset.id); showToast("Demanda excluída."); }
   }));
+  $$('.kanban-card [data-action="advance"]').forEach((btn) => btn.addEventListener("click", (event) => { event.stopPropagation(); moveKanbanTask(btn.dataset.id, btn.dataset.status); }));
+  $$('.kanban-card [data-action="archive"]').forEach((btn) => btn.addEventListener("click", (event) => { event.stopPropagation(); archiveKanbanTask(btn.dataset.id); }));
+  $$('#kanban-archive-list [data-action="archive-edit"]').forEach((btn) => btn.addEventListener("click", () => openKanbanTask(btn.dataset.id)));
+  $$('#kanban-archive-list [data-action="restore"]').forEach((btn) => btn.addEventListener("click", () => restoreKanbanTask(btn.dataset.id)));
 
   if (goalItems.length) renderGoals();
   refreshDashboard();
@@ -824,15 +881,7 @@ $$(".kanban-dropzone").forEach((zone) => {
     zone.classList.remove("drag-over");
     const id = e.dataTransfer.getData("text/plain");
     const status = zone.closest(".kanban-col").dataset.status;
-    const existing = kanbanItems.find((item) => item.id === id);
-    await kanbanApi.update(id, { status, completedAt: status === "done" ? (existing?.completedAt || new Date().toISOString()) : null });
-    if (status === "done" && existing?.recurrence && !existing.recurrenceGeneratedAt) {
-      const nextDeadline = nextRecurringDate(existing.deadline, existing.recurrence);
-      const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, completedAt: _completedAt, status: _status, comments: _comments, recurrenceGeneratedAt: _generated, userId: _userId, ...copy } = existing;
-      await kanbanApi.add(currentUser.uid, { ...copy, title: existing.title, status: "todo", deadline: nextDeadline, checklist: (existing.checklist || []).map((item) => ({ ...item, done: false })), comments: [] });
-      await kanbanApi.update(id, { recurrenceGeneratedAt: new Date().toISOString() });
-      showToast("Próxima demanda recorrente criada.");
-    }
+    await moveKanbanTask(id, status);
   });
 });
 
@@ -2076,9 +2125,10 @@ function refreshDashboard() {
     : `<p class="empty-state small">Cadastre um projeto para acompanhar o progresso aqui.</p>`;
 
   // ---- Resumo do Kanban ----
-  const total = kanbanItems.length || 1;
+  const activeKanbanItems = kanbanItems.filter((item) => !item.archived);
+  const total = activeKanbanItems.length || 1;
   $("#dash-kanban-summary").innerHTML = ["todo", "doing", "done"].map((status) => {
-    const count = kanbanItems.filter((i) => (i.status || "todo") === status).length;
+    const count = activeKanbanItems.filter((i) => (i.status || "todo") === status).length;
     const pct = Math.round((count / total) * 100);
     const meta = KANBAN_META[status];
     return `

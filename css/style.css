@@ -836,7 +836,19 @@ html[data-theme="light"] .icon-moon { display: block; }
 .kanban-card-desc { font-size: 0.8rem; color: var(--ink-muted); margin: 0 0 0.5rem; white-space: pre-wrap; }
 .kanban-card-actions { display: flex; gap: 0.5rem; }
 .kanban-card-actions button { border: none; background: none; color: var(--ink-muted); font-size: 0.74rem; text-decoration: underline; padding: 0; }
+.kanban-card-actions .kanban-next-action { margin-left: auto; color: var(--teal); font-weight: 700; text-decoration: none; }
+.kanban-card-actions .kanban-archive-action { margin-left: auto; color: var(--amber); font-weight: 700; text-decoration: none; }
 .kanban-toolbar .input { min-width: 170px; }
+.kanban-toolbar #kanban-archive-toggle { white-space: nowrap; }
+.kanban-toolbar #kanban-archive-count { font-family: var(--font-mono); color: var(--teal); }
+.kanban-archive { margin-top: 1rem; padding: 1rem; }
+.kanban-archive .glass-card-head { display: flex; justify-content: space-between; align-items: center; }
+.kanban-archive-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.kanban-archive-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.7rem; align-items: center; padding: 0.65rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-strong); }
+.kanban-archive-item strong { display: block; font-size: 0.84rem; }
+.kanban-archive-item .entry-meta { margin-top: 0.2rem; }
+.kanban-archive-actions { display: flex; gap: 0.55rem; }
+.kanban-archive-actions button { border: none; background: none; color: var(--teal); text-decoration: underline; font-size: 0.74rem; }
 .kanban-card-badges, .kanban-labels, .kanban-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-bottom: 0.45rem; }
 .kanban-effort, .kanban-recurring { font: 0.64rem var(--font-mono); color: var(--ink-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 0.16rem 0.45rem; }
 .kanban-labels span { font: 0.64rem var(--font-mono); color: var(--teal); background: var(--teal-soft); border-radius: 20px; padding: 0.15rem 0.45rem; }
@@ -929,6 +941,8 @@ html[data-theme="light"] .icon-moon { display: block; }
   .cal-day { height: 34px; font-size: 0.7rem; }
   .dash-hero { flex-direction: column; }
   .form-row-2, .form-row-3 { grid-template-columns: 1fr; }
+  .kanban-archive-item { grid-template-columns: 1fr; }
+  .kanban-archive-actions { justify-content: flex-end; }
   .diary-editor-grid { grid-template-columns: 1fr; }
   .project-link-editor-row { grid-template-columns: 1fr 28px; }
   .project-link-editor-row input[data-field="url"] { grid-column: 1 / -1; grid-row: 2; }
