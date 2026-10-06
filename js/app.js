@@ -1339,7 +1339,7 @@ function monthsInclusive(start, end) {
 }
 
 function calculateGoalProgress(goal) {
-  if (getGoalProgressMode(goal) === "manual") return { progress: clampPercent(goal.progress), parts: [], automatic: false };
+  if (getGoalProgressMode(goal) === "manual") return { progress: goal.completionReopened ? Math.min(99, clampPercent(goal.progress)) : clampPercent(goal.progress), parts: [], automatic: false };
   const { startStr, endStr, start, end } = getGoalPeriod(goal);
   if (goal.status === "Concluida" && Number(goal.progress) >= 100) return { progress: 100, parts: [], automatic: true, startStr, endStr };
   const parts = [];
@@ -1364,7 +1364,8 @@ function calculateGoalProgress(goal) {
     else expected = daysInclusive(effectiveStart, end);
     parts.push({ type: "Hábito", label: habit.title, progress: expected ? clampPercent((completed / expected) * 100) : 0, completed, expected });
   });
-  const progress = parts.length ? Math.round(parts.reduce((sum, part) => sum + part.progress, 0) / parts.length) : 0;
+  let progress = parts.length ? Math.round(parts.reduce((sum, part) => sum + part.progress, 0) / parts.length) : 0;
+  if (goal.completionReopened) progress = Math.min(99, progress);
   return { progress, parts, automatic: true, startStr, endStr };
 }
 
@@ -1488,6 +1489,7 @@ $("#meta-save-btn").addEventListener("click", async () => {
     linkedTaskIds: metaLinkTasks,
     linkedHabitIds: metaLinkHabits,
     completedAt: goalStatus === "Concluida" ? (existing?.completedAt || new Date().toISOString()) : null,
+    completionReopened: false,
   };
   if (!existing || existing.progress !== newProgress) {
     payload.progressLog = [...existingLog, { date: new Date().toISOString(), percent: newProgress, note: existing ? "Atualizado pelo formulário" : "Criação da meta" }];
@@ -1510,7 +1512,7 @@ async function quickUpdateGoalProgress(id, percent, note) {
   const clamped = clampPercent(percent);
   const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: clamped, note: note?.trim() || "" }];
   try {
-    await goalsApi.update(id, { progress: clamped, status: clamped >= 100 ? "Concluida" : (item.status === "Concluida" ? "Em andamento" : item.status), progressLog: log, completedAt: clamped >= 100 ? (item.completedAt || new Date().toISOString()) : null });
+    await goalsApi.update(id, { progress: clamped, status: clamped >= 100 ? "Concluida" : (item.status === "Concluida" ? "Em andamento" : item.status), progressLog: log, completedAt: clamped >= 100 ? (item.completedAt || new Date().toISOString()) : null, completionReopened: false });
     showToast("Progresso atualizado.");
   } catch (err) {
     console.error(err);
@@ -1523,8 +1525,17 @@ async function completeGoal(id) {
   if (!item) return;
   const now = new Date().toISOString();
   const log = [...(item.progressLog || []), { date: now, percent: 100, note: "Meta concluída" }];
-  await goalsApi.update(id, { status: "Concluida", progress: 100, completedAt: item.completedAt || now, progressLog: log });
+  await goalsApi.update(id, { status: "Concluida", progress: 100, completedAt: item.completedAt || now, progressLog: log, completionReopened: false });
   showToast("Meta concluída.");
+}
+
+async function reopenGoal(id) {
+  const item = goalItems.find((entry) => entry.id === id);
+  if (!item) return;
+  const reopenedProgress = Math.min(99, calculateGoalProgress({ ...item, status: "Em andamento", completionReopened: true }).progress);
+  const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: reopenedProgress, note: "Conclusão desmarcada; meta reaberta" }];
+  await goalsApi.update(id, { status: "Em andamento", progress: reopenedProgress, completedAt: null, completionReopened: true, progressLog: log });
+  showToast("Conclusão desmarcada. Meta reaberta.");
 }
 
 async function archiveGoal(id) {
@@ -1630,7 +1641,7 @@ function renderGoals(items) {
       </div>
 
       <div class="entry-actions">
-        ${item.status !== "Concluida" ? `<button data-action="complete" data-id="${item.id}">Concluir</button>` : ""}
+        <button data-action="${item.status === "Concluida" ? "reopen" : "complete"}" data-id="${item.id}">${item.status === "Concluida" ? "Desmarcar conclusão" : "Concluir"}</button>
         <button data-action="archive" data-id="${item.id}">Arquivar</button>
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
@@ -1660,6 +1671,7 @@ function renderGoals(items) {
   }));
   $$('#meta-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openGoalEntry(btn.dataset.id)));
   $$('#meta-list [data-action="complete"]').forEach((btn) => btn.addEventListener("click", () => completeGoal(btn.dataset.id)));
+  $$('#meta-list [data-action="reopen"]').forEach((btn) => btn.addEventListener("click", () => reopenGoal(btn.dataset.id)));
   $$('#meta-list [data-action="archive"]').forEach((btn) => btn.addEventListener("click", () => archiveGoal(btn.dataset.id)));
   $$('#meta-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir esta meta?")) { goalsApi.remove(btn.dataset.id); showToast("Meta excluída."); }
@@ -1907,7 +1919,7 @@ function renderHabits(items) {
       ${item.notes ? `<p class="entry-body">${escapeHtml(item.notes)}</p>` : ""}
 
       <div class="habit-card-actions">
-        <button data-action="${item.completed ? "reopen" : "complete"}" data-id="${item.id}">${item.completed ? "Reabrir" : "Concluir"}</button>
+        <button data-action="${item.completed ? "reopen" : "complete"}" data-id="${item.id}">${item.completed ? "Desmarcar conclusão" : "Concluir"}</button>
         <button data-action="archive" data-id="${item.id}">Arquivar</button>
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
