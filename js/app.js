@@ -945,6 +945,7 @@ const projetoForm = $("#projeto-form-wrap");
 let projetoChecklistDraft = [];
 let projetoLinksDraft = [];
 let projetoDependencyDraft = [];
+let projetoArchiveVisible = false;
 
 const PRIORITY_BADGE = { Baixa: "badge-baixa", Media: "badge-media", Alta: "badge-alta", Critica: "badge-critica" };
 const PRIORITY_LABEL = { Baixa: "Baixa", Media: "Média", Alta: "Alta", Critica: "Crítica" };
@@ -980,7 +981,7 @@ function renderProjectLinksEditor() {
 
 function renderProjectDependencies() {
   const editingId = $("#projeto-edit-id").value;
-  const available = projectItems.filter((project) => project.id !== editingId);
+  const available = projectItems.filter((project) => project.id !== editingId && !project.archived);
   $("#projeto-dependencies").innerHTML = available.length ? available.map((project) => `
     <button type="button" class="tag-toggle ${projetoDependencyDraft.includes(project.id) ? "active" : ""}" data-id="${project.id}">${escapeHtml(project.title)}</button>`).join("") : `<span class="project-editor-empty">Nenhum outro projeto disponível.</span>`;
 }
@@ -1029,6 +1030,11 @@ $("#projeto-progress").addEventListener("input", (e) => {
   $("#projeto-progress-value").textContent = e.target.value;
 });
 $("#projeto-filter-status").addEventListener("change", () => renderProjects());
+$("#projeto-archive-toggle").addEventListener("click", () => {
+  projetoArchiveVisible = !projetoArchiveVisible;
+  $("#projeto-archive").classList.toggle("hidden", !projetoArchiveVisible);
+  $("#projeto-archive-toggle").classList.toggle("active", projetoArchiveVisible);
+});
 
 $("#projeto-save-btn").addEventListener("click", async () => {
   const title = $("#projeto-title").value.trim();
@@ -1072,7 +1078,7 @@ $("#projeto-save-btn").addEventListener("click", async () => {
 
   try {
     if (editId) await projectsApi.update(editId, payload);
-    else await projectsApi.add(currentUser.uid, payload);
+    else await projectsApi.add(currentUser.uid, { ...payload, archived: false, archivedAt: null });
     projetoForm.classList.add("hidden");
     showToast(editId ? "Projeto atualizado." : "Projeto criado.");
   } catch (err) {
@@ -1095,6 +1101,34 @@ async function quickUpdateProgress(id, percent, note) {
     console.error(err);
     showToast("Não foi possível registrar a atualização. Tente novamente.", "error");
   }
+}
+
+async function completeProject(id) {
+  const item = projectItems.find((entry) => entry.id === id);
+  if (!item) return;
+  const now = new Date().toISOString();
+  const log = [...(item.progressLog || []), { date: now, percent: 100, note: "Projeto concluído" }];
+  await projectsApi.update(id, { status: "Concluido", progress: 100, completedAt: item.completedAt || now, progressLog: log });
+  showToast("Projeto concluído.");
+}
+
+async function reopenProject(id) {
+  const item = projectItems.find((entry) => entry.id === id);
+  if (!item) return;
+  const reopenedProgress = Math.min(99, Number(item.progress) || 0);
+  const log = [...(item.progressLog || []), { date: new Date().toISOString(), percent: reopenedProgress, note: "Conclusão desmarcada; projeto reaberto" }];
+  await projectsApi.update(id, { status: "Em andamento", progress: reopenedProgress, completedAt: null, progressLog: log });
+  showToast("Conclusão desmarcada. Projeto reaberto.");
+}
+
+async function archiveProject(id) {
+  await projectsApi.update(id, { archived: true, archivedAt: new Date().toISOString() });
+  showToast("Projeto arquivado.");
+}
+
+async function restoreProject(id) {
+  await projectsApi.update(id, { archived: false, archivedAt: null });
+  showToast("Projeto restaurado.");
 }
 
 async function toggleProjectChecklistItem(projectId, checklistId) {
@@ -1146,6 +1180,7 @@ function renderProjects(items) {
   const statusFilter = $("#projeto-filter-status").value;
   const todayStr = new Date().toISOString().slice(0, 10);
   const sorted = [...projectItems]
+    .filter((i) => !i.archived)
     .filter((i) => !statusFilter || i.status === statusFilter)
     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
@@ -1168,7 +1203,7 @@ function renderProjects(items) {
     `).join("");
 
     return `
-    <article class="entry-card">
+    <article class="entry-card ${item.status === "Concluido" ? "record-completed" : ""}">
       <div class="entry-card-top">
         <span class="entry-tag" style="background:var(--teal-soft); color:var(--teal);">${escapeHtml(item.category || "Outro")}</span>
         <span class="badge ${priorityClass}">${PRIORITY_LABEL[item.priority] || item.priority}</span>
@@ -1214,12 +1249,24 @@ function renderProjects(items) {
       </div>
 
       <div class="entry-actions">
+        <button data-action="${item.status === "Concluido" ? "reopen" : "complete"}" data-id="${item.id}">${item.status === "Concluido" ? "Desmarcar conclusão" : "Concluir"}</button>
+        <button data-action="archive" data-id="${item.id}">Arquivar</button>
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
       </div>
     </article>
   `;
   }).join("");
+
+  const archived = [...projectItems].filter((item) => item.archived).sort((a, b) => new Date(b.archivedAt || 0) - new Date(a.archivedAt || 0));
+  $("#projeto-archive-count").textContent = archived.length;
+  $("#projeto-archive").classList.toggle("hidden", !projetoArchiveVisible);
+  $("#projeto-archive-empty").classList.toggle("hidden", archived.length > 0);
+  $("#projeto-archive-list").innerHTML = archived.map((item) => `
+    <article class="record-archive-item">
+      <div><strong>${escapeHtml(item.title)}</strong><div class="entry-meta"><span>${escapeHtml(item.status || "Planejamento")}</span>${item.archivedAt ? `<span>Arquivado ${relativeTime(new Date(item.archivedAt))}</span>` : ""}</div></div>
+      <div class="record-archive-actions"><button data-action="archive-edit" data-id="${item.id}">Consultar</button><button data-action="restore" data-id="${item.id}">Restaurar</button></div>
+    </article>`).join("");
 
   $$('#projeto-list [data-action="toggle-log"]').forEach((btn) => btn.addEventListener("click", () => {
     $(`#log-panel-${btn.dataset.id}`).classList.toggle("hidden");
@@ -1233,9 +1280,14 @@ function renderProjects(items) {
   $$('#projeto-list [data-action="toggle-check"]').forEach((input) => input.addEventListener("change", () => toggleProjectChecklistItem(input.dataset.projectId, input.dataset.checkId)));
   $$('#projeto-list [data-action="open-dependency"]').forEach((btn) => btn.addEventListener("click", () => openProjectEntry(btn.dataset.id)));
   $$('#projeto-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openProjectEntry(btn.dataset.id)));
+  $$('#projeto-list [data-action="complete"]').forEach((btn) => btn.addEventListener("click", () => completeProject(btn.dataset.id)));
+  $$('#projeto-list [data-action="reopen"]').forEach((btn) => btn.addEventListener("click", () => reopenProject(btn.dataset.id)));
+  $$('#projeto-list [data-action="archive"]').forEach((btn) => btn.addEventListener("click", () => archiveProject(btn.dataset.id)));
   $$('#projeto-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir este projeto?")) { projectsApi.remove(btn.dataset.id); showToast("Projeto excluído."); }
   }));
+  $$('#projeto-archive-list [data-action="archive-edit"]').forEach((btn) => btn.addEventListener("click", () => openProjectEntry(btn.dataset.id)));
+  $$('#projeto-archive-list [data-action="restore"]').forEach((btn) => btn.addEventListener("click", () => restoreProject(btn.dataset.id)));
 
   if (goalItems.length) renderGoals();
   refreshDashboard();
@@ -1329,8 +1381,9 @@ function updateMetaProgressMode() {
 }
 
 function renderMetaProjectToggles() {
-  $("#meta-link-projects").innerHTML = projectItems.length
-    ? projectItems.map((p) => `<button type="button" class="tag-toggle ${metaLinkProjects.includes(p.id) ? "active" : ""}" data-id="${p.id}">${escapeHtml(p.title)}</button>`).join("")
+  const availableProjects = projectItems.filter((item) => !item.archived);
+  $("#meta-link-projects").innerHTML = availableProjects.length
+    ? availableProjects.map((p) => `<button type="button" class="tag-toggle ${metaLinkProjects.includes(p.id) ? "active" : ""}" data-id="${p.id}">${escapeHtml(p.title)}</button>`).join("")
     : `<p class="empty-state small">Nenhum projeto cadastrado ainda.</p>`;
   $$(".tag-toggle", $("#meta-link-projects")).forEach((btn) => btn.addEventListener("click", () => {
     const id = btn.dataset.id;
@@ -2214,7 +2267,7 @@ function refreshDashboard() {
 
   // ---- Tira de estatísticas ----
   const openTasks = kanbanItems.filter((i) => i.status !== "done").length;
-  const activeProjects = projectItems.filter((i) => i.status !== "Concluido").length;
+  const activeProjects = projectItems.filter((i) => !i.archived && i.status !== "Concluido").length;
   const nextBirthday = upcomingBirthdays(1)[0];
   const contactDueCount = birthdayItems.filter((person) => { if (!person.lastContact) return Boolean(person.email || person.phone || person.category); return Math.floor((Date.now() - new Date(person.lastContact + "T00:00:00")) / 86400000) >= (person.contactFrequencyDays || 30); }).length;
   const stats = [
@@ -2246,7 +2299,7 @@ function refreshDashboard() {
   `).join("");
 
   // ---- Aro de progresso médio dos projetos ativos ----
-  const active = projectItems.filter((i) => i.status !== "Concluido");
+  const active = projectItems.filter((i) => !i.archived && i.status !== "Concluido");
   const avg = active.length ? Math.round(active.reduce((sum, i) => sum + (i.progress || 0), 0) / active.length) : 0;
   const deg = Math.round(avg * 3.6);
   $("#dash-ring-wrap").innerHTML = `
@@ -2326,7 +2379,7 @@ function refreshDashboard() {
 
   // ---- Prazos próximos (projetos + eventos) ----
   const projectDeadlines = projectItems
-    .filter((i) => i.deadline && i.status !== "Concluido")
+    .filter((i) => !i.archived && i.deadline && i.status !== "Concluido")
     .map((i) => ({ title: i.title, date: i.deadline, overdue: i.deadline < todayStr, kind: "Projeto" }));
   const eventDeadlines = upcomingEvents().map((i) => ({ title: i.title, date: i.date, time: i.time, overdue: false, kind: "Evento" }));
   const deadlines = [...projectDeadlines, ...eventDeadlines].sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`)).slice(0, 6);
@@ -2496,7 +2549,7 @@ function renderInsights() {
   const completionRate = createdCount ? Math.round(completedInPeriod.length / createdCount * 100) : 0;
   const bestHabit = habitScores[0];
   const activeGoals = goalItems.filter((goal) => !goal.archived && goal.status !== "Concluida");
-  const activeInsightProjects = projectItems.filter((project) => project.status !== "Concluido");
+  const activeInsightProjects = projectItems.filter((project) => !project.archived && project.status !== "Concluido");
   const projectsAtRisk = activeInsightProjects.filter((project) => (project.risks || []).length || (project.hoursEstimated > 0 && project.hoursSpent > project.hoursEstimated));
   const projectsWithoutAction = activeInsightProjects.filter((project) => !project.nextAction).length;
   const openInsightTasks = kanbanItems.filter((task) => task.status !== "done");
@@ -2612,7 +2665,7 @@ function buildDailyBrief() {
   // Projetos parados: status "Pausado" ou sem atualização de progresso há 14+ dias
   const STALL_DAYS = 14;
   const now = Date.now();
-  const stalledProjects = projectItems.filter((p) => {
+  const stalledProjects = projectItems.filter((p) => !p.archived && p.status !== "Concluido").filter((p) => {
     if (p.status === "Concluido") return false;
     if (p.status === "Pausado") return true;
     const log = p.progressLog || [];
@@ -2634,7 +2687,7 @@ function buildDailyBrief() {
   }
 
   // Próximo prazo (projeto ou evento)
-  const projectDeadlines = projectItems.filter((p) => p.deadline && p.status !== "Concluido").map((p) => ({ title: p.title, date: p.deadline, time: null, kind: "projeto" }));
+  const projectDeadlines = projectItems.filter((p) => !p.archived && p.deadline && p.status !== "Concluido").map((p) => ({ title: p.title, date: p.deadline, time: null, kind: "projeto" }));
   const eventDeadlines = upcomingEvents().map((e) => ({ title: e.title, date: e.date, time: e.time, kind: "evento" }));
   const nextDeadline = [...projectDeadlines, ...eventDeadlines].sort((a, b) => `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`))[0];
   if (nextDeadline) {
@@ -2883,7 +2936,7 @@ function getDayInfo(dateObj) {
   const dateStr = ymd(y, m, d);
   const events = eventItems.filter((i) => i.date === dateStr);
   const bdays = birthdayItems.filter((i) => i.day === d && i.month === m + 1);
-  const deadlines = projectItems.filter((i) => i.deadline === dateStr && i.status !== "Concluido");
+  const deadlines = projectItems.filter((i) => !i.archived && i.deadline === dateStr && i.status !== "Concluido");
   return { events, bdays, deadlines };
 }
 

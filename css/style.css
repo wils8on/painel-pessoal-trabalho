@@ -1300,7 +1300,7 @@ kbd, .cmdk-esc {
 .habit-stats strong { color: var(--ink); }
 .habit-card-actions { display: flex; gap: 0.6rem; margin-top: auto; }
 .habit-card-actions button { border: none; background: none; color: var(--ink-muted); font-size: 0.76rem; text-decoration: underline; padding: 0; }
-.habit-card-actions [data-action="complete"], .entry-actions [data-action="complete"] { color: var(--teal); font-weight: 700; }
+.habit-card-actions [data-action="complete"], .habit-card-actions [data-action="reopen"], .entry-actions [data-action="complete"], .entry-actions [data-action="reopen"] { color: var(--teal); font-weight: 700; }
 .habit-card-actions [data-action="archive"], .entry-actions [data-action="archive"] { color: var(--amber); font-weight: 700; }
 .archive-toggle { white-space: nowrap; }
 .archive-toggle span { font-family: var(--font-mono); color: var(--teal); }

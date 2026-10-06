@@ -479,10 +479,16 @@
           <option value="Pausado">Pausado</option>
           <option value="Concluido">Concluído</option>
         </select>
+        <button type="button" class="btn btn-ghost archive-toggle" id="projeto-archive-toggle">Arquivados <span id="projeto-archive-count">0</span></button>
       </div>
 
       <div id="projeto-list" class="card-grid"></div>
       <p class="empty-state" id="projeto-empty">Nenhum projeto cadastrado ainda.</p>
+      <section class="glass-card record-archive hidden" id="projeto-archive">
+        <div class="glass-card-head"><h3>Projetos arquivados</h3></div>
+        <div id="projeto-archive-list" class="record-archive-list"></div>
+        <p id="projeto-archive-empty" class="empty-state small">Nenhum projeto arquivado.</p>
+      </section>
     </section>
 
     <!-- VIEW 4.1 — Metas -->
