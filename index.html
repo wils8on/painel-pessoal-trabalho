@@ -556,10 +556,16 @@
           <option value="Pausada">Pausada</option>
           <option value="Concluida">Concluída</option>
         </select>
+        <button type="button" class="btn btn-ghost archive-toggle" id="meta-archive-toggle">Arquivadas <span id="meta-archive-count">0</span></button>
       </div>
 
       <div id="meta-list" class="card-grid"></div>
       <p class="empty-state" id="meta-empty">Nenhuma meta cadastrada ainda.</p>
+      <section class="glass-card record-archive hidden" id="meta-archive">
+        <div class="glass-card-head"><h3>Metas arquivadas</h3></div>
+        <div id="meta-archive-list" class="record-archive-list"></div>
+        <p id="meta-archive-empty" class="empty-state small">Nenhuma meta arquivada.</p>
+      </section>
     </section>
 
     <!-- VIEW 4.2 — Hábitos -->
@@ -600,8 +606,16 @@
         </div>
       </div>
 
+      <div class="toolbar archive-only-toolbar">
+        <button type="button" class="btn btn-ghost archive-toggle" id="habito-archive-toggle">Arquivados <span id="habito-archive-count">0</span></button>
+      </div>
       <div id="habito-list" class="habit-grid"></div>
       <p class="empty-state" id="habito-empty">Nenhum hábito cadastrado ainda.</p>
+      <section class="glass-card record-archive hidden" id="habito-archive">
+        <div class="glass-card-head"><h3>Hábitos arquivados</h3></div>
+        <div id="habito-archive-list" class="record-archive-list"></div>
+        <p id="habito-archive-empty" class="empty-state small">Nenhum hábito arquivado.</p>
+      </section>
     </section>
 
     <section class="view" id="view-pessoas" data-accent="rust"><header class="view-header"><div class="view-header-title"><span class="view-icon" data-accent="rust">♙</span><div><h2 class="view-title">Pessoas</h2><p class="view-subtitle">Contatos, relações e momentos importantes.</p></div></div><button class="btn btn-primary" data-accent="rust" id="pessoa-new-btn">+ Nova pessoa</button></header><div id="pessoa-form" class="form-card hidden"><input type="hidden" id="pessoa-id"/><div class="form-row form-row-2"><input id="pessoa-name" class="input" placeholder="Nome completo"/><select id="pessoa-category" class="input select"><option>Amigos</option><option>Família</option><option>Trabalho</option><option>Contatos</option></select></div><div class="form-row form-row-3"><input id="pessoa-email" type="email" class="input" placeholder="E-mail"/><input id="pessoa-phone" class="input" placeholder="Telefone"/><input id="pessoa-photo" type="url" class="input" placeholder="URL da foto"/></div><div class="form-row form-row-2"><input id="pessoa-company" class="input" placeholder="Empresa"/><input id="pessoa-role" class="input" placeholder="Cargo / contexto"/></div><div class="form-row form-row-3"><label class="field-label">Aniversário · dia<select id="pessoa-day" class="input select"></select></label><label class="field-label">Mês<select id="pessoa-month" class="input select"><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></label><label class="field-label">Manter contato a cada (dias)<input id="pessoa-frequency" type="number" min="1" class="input mono" value="30"/></label></div><div class="form-row form-row-2"><label class="field-label">Último contato<input id="pessoa-last-contact" type="date" class="input mono"/></label><input id="pessoa-social" class="input" placeholder="Rede social / link"/></div><textarea id="pessoa-notes" class="input textarea" rows="3" placeholder="Notas sobre a pessoa"></textarea><div class="project-form-section"><p class="tag-toggle-group-label">Projetos relacionados</p><div id="pessoa-projects" class="tag-toggle-group"></div><p class="tag-toggle-group-label">Demandas relacionadas</p><div id="pessoa-tasks" class="tag-toggle-group"></div></div><div class="form-actions"><button id="pessoa-cancel" class="btn btn-ghost">Cancelar</button><button id="pessoa-save" class="btn btn-primary" data-accent="rust">Salvar</button></div></div><div class="toolbar"><input id="pessoa-search" type="search" class="input" placeholder="Buscar pessoas…"/><select id="pessoa-filter-category" class="input select"><option value="">Todas as categorias</option><option>Amigos</option><option>Família</option><option>Trabalho</option><option>Contatos</option></select></div><div id="pessoa-list" class="people-grid"></div><p id="pessoa-empty" class="empty-state">Nenhuma pessoa cadastrada.</p></section>

@@ -1249,6 +1249,7 @@ const metaForm = $("#meta-form-wrap");
 let metaLinkProjects = [];
 let metaLinkTasks = [];
 let metaLinkHabits = [];
+let metaArchiveVisible = false;
 
 const GOAL_STATUS_LABEL = { "Nao iniciada": "Não iniciada", "Em andamento": "Em andamento", "Pausada": "Pausada", "Concluida": "Concluída" };
 
@@ -1288,6 +1289,7 @@ function monthsInclusive(start, end) {
 function calculateGoalProgress(goal) {
   if (getGoalProgressMode(goal) === "manual") return { progress: clampPercent(goal.progress), parts: [], automatic: false };
   const { startStr, endStr, start, end } = getGoalPeriod(goal);
+  if (goal.status === "Concluida" && Number(goal.progress) >= 100) return { progress: 100, parts: [], automatic: true, startStr, endStr };
   const parts = [];
   (goal.linkedProjectIds || []).forEach((id) => {
     const project = projectItems.find((item) => item.id === id);
@@ -1338,8 +1340,9 @@ function renderMetaProjectToggles() {
   }));
 }
 function renderMetaTaskToggles() {
-  $("#meta-link-tasks").innerHTML = kanbanItems.length
-    ? kanbanItems.map((t) => `<button type="button" class="tag-toggle ${metaLinkTasks.includes(t.id) ? "active" : ""}" data-id="${t.id}">${escapeHtml(t.title)}</button>`).join("")
+  const availableTasks = kanbanItems.filter((item) => !item.archived);
+  $("#meta-link-tasks").innerHTML = availableTasks.length
+    ? availableTasks.map((t) => `<button type="button" class="tag-toggle ${metaLinkTasks.includes(t.id) ? "active" : ""}" data-id="${t.id}">${escapeHtml(t.title)}</button>`).join("")
     : `<p class="empty-state small">Nenhuma demanda cadastrada ainda.</p>`;
   $$(".tag-toggle", $("#meta-link-tasks")).forEach((btn) => btn.addEventListener("click", () => {
     const id = btn.dataset.id;
@@ -1349,8 +1352,9 @@ function renderMetaTaskToggles() {
   }));
 }
 function renderMetaHabitToggles() {
-  $("#meta-link-habits").innerHTML = habitItems.length
-    ? habitItems.map((h) => `<button type="button" class="tag-toggle ${metaLinkHabits.includes(h.id) ? "active" : ""}" data-id="${h.id}">${escapeHtml(h.emoji || "🔁")} ${escapeHtml(h.title)}</button>`).join("")
+  const availableHabits = habitItems.filter((item) => !item.archived && !item.completed);
+  $("#meta-link-habits").innerHTML = availableHabits.length
+    ? availableHabits.map((h) => `<button type="button" class="tag-toggle ${metaLinkHabits.includes(h.id) ? "active" : ""}" data-id="${h.id}">${escapeHtml(h.emoji || "🔁")} ${escapeHtml(h.title)}</button>`).join("")
     : `<p class="empty-state small">Nenhum hábito cadastrado ainda.</p>`;
   $$(".tag-toggle", $("#meta-link-habits")).forEach((btn) => btn.addEventListener("click", () => {
     const id = btn.dataset.id;
@@ -1394,6 +1398,11 @@ $("#meta-progress-mode").addEventListener("change", updateMetaProgressMode);
 [$("#meta-start-date"), $("#meta-deadline")].forEach((input) => input.addEventListener("change", updateMetaProgressMode));
 $("#meta-filter-status").addEventListener("change", () => renderGoals());
 $("#meta-search").addEventListener("input", () => renderGoals());
+$("#meta-archive-toggle").addEventListener("click", () => {
+  metaArchiveVisible = !metaArchiveVisible;
+  $("#meta-archive").classList.toggle("hidden", !metaArchiveVisible);
+  $("#meta-archive-toggle").classList.toggle("active", metaArchiveVisible);
+});
 
 $("#meta-save-btn").addEventListener("click", async () => {
   const title = $("#meta-title").value.trim();
@@ -1456,6 +1465,25 @@ async function quickUpdateGoalProgress(id, percent, note) {
   }
 }
 
+async function completeGoal(id) {
+  const item = goalItems.find((entry) => entry.id === id);
+  if (!item) return;
+  const now = new Date().toISOString();
+  const log = [...(item.progressLog || []), { date: now, percent: 100, note: "Meta concluída" }];
+  await goalsApi.update(id, { status: "Concluida", progress: 100, completedAt: item.completedAt || now, progressLog: log });
+  showToast("Meta concluída.");
+}
+
+async function archiveGoal(id) {
+  await goalsApi.update(id, { archived: true, archivedAt: new Date().toISOString() });
+  showToast("Meta arquivada.");
+}
+
+async function restoreGoal(id) {
+  await goalsApi.update(id, { archived: false, archivedAt: null });
+  showToast("Meta restaurada.");
+}
+
 function openGoalEntry(id) {
   const item = goalItems.find((i) => i.id === id);
   if (!item) return;
@@ -1484,6 +1512,7 @@ function renderGoals(items) {
   const search = $("#meta-search").value.toLowerCase();
   const statusFilter = $("#meta-filter-status").value;
   const sorted = [...goalItems]
+    .filter((i) => !i.archived)
     .filter((i) => !statusFilter || i.status === statusFilter)
     .filter((i) => !search || i.title.toLowerCase().includes(search) || (i.description || "").toLowerCase().includes(search))
     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -1511,7 +1540,7 @@ function renderGoals(items) {
     `).join("");
 
     return `
-    <article class="entry-card">
+    <article class="entry-card ${item.status === "Concluida" ? "record-completed" : ""}">
       <div class="entry-card-top">
         <span class="entry-tag" style="background:var(--teal-soft); color:var(--teal);">${escapeHtml(item.category || "Outro")}</span>
         <span class="badge ${priorityClass}">${PRIORITY_LABEL[item.priority] || item.priority}</span>
@@ -1548,12 +1577,24 @@ function renderGoals(items) {
       </div>
 
       <div class="entry-actions">
+        ${item.status !== "Concluida" ? `<button data-action="complete" data-id="${item.id}">Concluir</button>` : ""}
+        <button data-action="archive" data-id="${item.id}">Arquivar</button>
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
       </div>
     </article>
   `;
   }).join("");
+
+  const archived = [...goalItems].filter((item) => item.archived).sort((a, b) => new Date(b.archivedAt || 0) - new Date(a.archivedAt || 0));
+  $("#meta-archive-count").textContent = archived.length;
+  $("#meta-archive").classList.toggle("hidden", !metaArchiveVisible);
+  $("#meta-archive-empty").classList.toggle("hidden", archived.length > 0);
+  $("#meta-archive-list").innerHTML = archived.map((item) => `
+    <article class="record-archive-item">
+      <div><strong>${escapeHtml(item.title)}</strong><div class="entry-meta"><span>${GOAL_STATUS_LABEL[item.status] || item.status}</span>${item.archivedAt ? `<span>Arquivada ${relativeTime(new Date(item.archivedAt))}</span>` : ""}</div></div>
+      <div class="record-archive-actions"><button data-action="archive-edit" data-id="${item.id}">Consultar</button><button data-action="restore" data-id="${item.id}">Restaurar</button></div>
+    </article>`).join("");
 
   $$('#meta-list [data-action="toggle-log"]').forEach((btn) => btn.addEventListener("click", () => {
     $(`#goal-log-panel-${btn.dataset.id}`).classList.toggle("hidden");
@@ -1565,10 +1606,14 @@ function renderGoals(items) {
     await quickUpdateGoalProgress(id, percent, note);
   }));
   $$('#meta-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openGoalEntry(btn.dataset.id)));
+  $$('#meta-list [data-action="complete"]').forEach((btn) => btn.addEventListener("click", () => completeGoal(btn.dataset.id)));
+  $$('#meta-list [data-action="archive"]').forEach((btn) => btn.addEventListener("click", () => archiveGoal(btn.dataset.id)));
   $$('#meta-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir esta meta?")) { goalsApi.remove(btn.dataset.id); showToast("Meta excluída."); }
   }));
   $$("#meta-list .linked-chip").forEach((chip) => chip.addEventListener("click", () => openActivityItem(chip.dataset.type, chip.dataset.id)));
+  $$('#meta-archive-list [data-action="archive-edit"]').forEach((btn) => btn.addEventListener("click", () => openGoalEntry(btn.dataset.id)));
+  $$('#meta-archive-list [data-action="restore"]').forEach((btn) => btn.addEventListener("click", () => restoreGoal(btn.dataset.id)));
 
   refreshDashboard();
 }
@@ -1580,6 +1625,13 @@ let habitItems = [];
 const habitoForm = $("#habito-form-wrap");
 const HABIT_FREQ_LABEL = { diario: "Diário", semanal: "Semanal", mensal: "Mensal" };
 const habitCleanupPending = new Set();
+let habitArchiveVisible = false;
+
+$("#habito-archive-toggle").addEventListener("click", () => {
+  habitArchiveVisible = !habitArchiveVisible;
+  $("#habito-archive").classList.toggle("hidden", !habitArchiveVisible);
+  $("#habito-archive-toggle").classList.toggle("active", habitArchiveVisible);
+});
 
 function updateHabitTargetVisibility() {
   const freq = $("#habito-frequency").value;
@@ -1619,7 +1671,7 @@ $("#habito-save-btn").addEventListener("click", async () => {
   const editId = $("#habito-edit-id").value;
   try {
     if (editId) await habitsApi.update(editId, payload);
-    else await habitsApi.add(currentUser.uid, { ...payload, completions: [] });
+    else await habitsApi.add(currentUser.uid, { ...payload, completions: [], completed: false, completedAt: null, archived: false, archivedAt: null });
     habitoForm.classList.add("hidden");
     showToast(editId ? "Hábito atualizado." : "Hábito criado.");
   } catch (err) {
@@ -1645,6 +1697,7 @@ function openHabitEntry(id) {
 async function toggleHabitCompletion(id, dateStr) {
   const item = habitItems.find((i) => i.id === id);
   if (!item) return;
+  if (item.completed || item.archived) return showToast("Reabra o hábito antes de registrar novas marcações.", "error");
   const today = new Date();
   const localTodayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
   if (dateStr > localTodayStr) return showToast("Não é possível marcar um hábito em uma data futura.", "error");
@@ -1656,6 +1709,26 @@ async function toggleHabitCompletion(id, dateStr) {
     console.error(err);
     showToast("Não foi possível registrar. Tente novamente.", "error");
   }
+}
+
+async function completeHabit(id) {
+  await habitsApi.update(id, { completed: true, completedAt: new Date().toISOString() });
+  showToast("Hábito concluído.");
+}
+
+async function reopenHabit(id) {
+  await habitsApi.update(id, { completed: false, completedAt: null });
+  showToast("Hábito reaberto.");
+}
+
+async function archiveHabit(id) {
+  await habitsApi.update(id, { archived: true, archivedAt: new Date().toISOString() });
+  showToast("Hábito arquivado.");
+}
+
+async function restoreHabit(id) {
+  await habitsApi.update(id, { archived: false, archivedAt: null });
+  showToast("Hábito restaurado.");
 }
 
 function getWeekKey(date) {
@@ -1747,7 +1820,7 @@ function renderHabits(items) {
       return { ...item, completions: validCompletions };
     });
   }
-  const sorted = [...habitItems].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const sorted = [...habitItems].filter((item) => !item.archived).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   $("#habito-empty").classList.toggle("hidden", sorted.length > 0);
 
   const today = new Date();
@@ -1759,7 +1832,7 @@ function renderHabits(items) {
     const doneToday = (item.completions || []).includes(todayStr);
     const streakUnit = item.frequency === "diario" ? "dia(s)" : item.frequency === "semanal" ? "semana(s)" : "mês(es)";
     return `
-    <article class="habit-card">
+    <article class="habit-card ${item.completed ? "record-completed" : ""}">
       <div class="habit-card-head">
         <span class="habit-emoji">${escapeHtml(item.emoji || "🔁")}</span>
         <div class="habit-title-wrap">
@@ -1769,7 +1842,9 @@ function renderHabits(items) {
         <span class="habit-streak-badge">🔥 ${streak} ${streakUnit}</span>
       </div>
 
-      <button type="button" class="habit-today-btn ${doneToday ? "done" : ""}" data-action="toggle-today" data-id="${item.id}">
+      ${item.completed ? `<span class="badge badge-status">✓ Concluído</span>` : ""}
+
+      <button type="button" class="habit-today-btn ${doneToday ? "done" : ""}" data-action="toggle-today" data-id="${item.id}" ${item.completed ? "disabled" : ""}>
         ${doneToday ? "✓ Feito hoje" : "Marcar hoje"}
       </button>
 
@@ -1779,6 +1854,8 @@ function renderHabits(items) {
       ${item.notes ? `<p class="entry-body">${escapeHtml(item.notes)}</p>` : ""}
 
       <div class="habit-card-actions">
+        <button data-action="${item.completed ? "reopen" : "complete"}" data-id="${item.id}">${item.completed ? "Reabrir" : "Concluir"}</button>
+        <button data-action="archive" data-id="${item.id}">Arquivar</button>
         <button data-action="edit" data-id="${item.id}">Editar</button>
         <button data-action="delete" data-id="${item.id}">Excluir</button>
       </div>
@@ -1786,12 +1863,27 @@ function renderHabits(items) {
   `;
   }).join("");
 
+  const archived = [...habitItems].filter((item) => item.archived).sort((a, b) => new Date(b.archivedAt || 0) - new Date(a.archivedAt || 0));
+  $("#habito-archive-count").textContent = archived.length;
+  $("#habito-archive").classList.toggle("hidden", !habitArchiveVisible);
+  $("#habito-archive-empty").classList.toggle("hidden", archived.length > 0);
+  $("#habito-archive-list").innerHTML = archived.map((item) => `
+    <article class="record-archive-item">
+      <div><strong>${escapeHtml(item.emoji || "🔁")} ${escapeHtml(item.title)}</strong><div class="entry-meta"><span>${item.completed ? "Concluído" : "Ativo"}</span>${item.archivedAt ? `<span>Arquivado ${relativeTime(new Date(item.archivedAt))}</span>` : ""}</div></div>
+      <div class="record-archive-actions"><button data-action="archive-edit" data-id="${item.id}">Consultar</button><button data-action="restore" data-id="${item.id}">Restaurar</button></div>
+    </article>`).join("");
+
   $$('#habito-list [data-action="toggle-today"]').forEach((btn) => btn.addEventListener("click", () => toggleHabitCompletion(btn.dataset.id, todayStr)));
   $$(".habit-cell:not(.empty):not(.future)", $("#habito-list")).forEach((cell) => cell.addEventListener("click", () => toggleHabitCompletion(cell.dataset.id, cell.dataset.date)));
   $$('#habito-list [data-action="edit"]').forEach((btn) => btn.addEventListener("click", () => openHabitEntry(btn.dataset.id)));
+  $$('#habito-list [data-action="complete"]').forEach((btn) => btn.addEventListener("click", () => completeHabit(btn.dataset.id)));
+  $$('#habito-list [data-action="reopen"]').forEach((btn) => btn.addEventListener("click", () => reopenHabit(btn.dataset.id)));
+  $$('#habito-list [data-action="archive"]').forEach((btn) => btn.addEventListener("click", () => archiveHabit(btn.dataset.id)));
   $$('#habito-list [data-action="delete"]').forEach((btn) => btn.addEventListener("click", () => {
     if (confirm("Excluir este hábito?")) { habitsApi.remove(btn.dataset.id); showToast("Hábito excluído."); }
   }));
+  $$('#habito-archive-list [data-action="archive-edit"]').forEach((btn) => btn.addEventListener("click", () => openHabitEntry(btn.dataset.id)));
+  $$('#habito-archive-list [data-action="restore"]').forEach((btn) => btn.addEventListener("click", () => restoreHabit(btn.dataset.id)));
 
   if (goalItems.length) renderGoals();
   refreshDashboard();
@@ -2197,7 +2289,7 @@ function refreshDashboard() {
   const localToday = new Date();
   const todayStr = ymd(localToday.getFullYear(), localToday.getMonth(), localToday.getDate());
   const highlightGoals = [...goalItems]
-    .filter((g) => g.status !== "Concluida")
+    .filter((g) => !g.archived && g.status !== "Concluida")
     .sort((a, b) => {
       if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
       if (a.deadline) return -1;
@@ -2216,8 +2308,9 @@ function refreshDashboard() {
   $$("#dash-goals-list .mini-progress-row").forEach((row) => row.addEventListener("click", () => openGoalEntry(row.dataset.id)));
 
   // ---- Hábitos de hoje ----
-  $("#dash-habits-empty").classList.toggle("hidden", habitItems.length > 0);
-  $("#dash-habits-today").innerHTML = habitItems.map((h) => {
+  const activeHabits = habitItems.filter((habit) => !habit.archived && !habit.completed);
+  $("#dash-habits-empty").classList.toggle("hidden", activeHabits.length > 0);
+  $("#dash-habits-today").innerHTML = activeHabits.map((h) => {
     const streak = getHabitStreak(h);
     const streakUnit = h.frequency === "diario" ? "d" : h.frequency === "semanal" ? "sem" : "mês";
     const doneToday = (h.completions || []).includes(todayStr);
@@ -2402,7 +2495,7 @@ function renderInsights() {
 
   const completionRate = createdCount ? Math.round(completedInPeriod.length / createdCount * 100) : 0;
   const bestHabit = habitScores[0];
-  const activeGoals = goalItems.filter((goal) => goal.status !== "Concluida");
+  const activeGoals = goalItems.filter((goal) => !goal.archived && goal.status !== "Concluida");
   const activeInsightProjects = projectItems.filter((project) => project.status !== "Concluido");
   const projectsAtRisk = activeInsightProjects.filter((project) => (project.risks || []).length || (project.hoursEstimated > 0 && project.hoursSpent > project.hoursEstimated));
   const projectsWithoutAction = activeInsightProjects.filter((project) => !project.nextAction).length;

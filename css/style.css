@@ -1300,6 +1300,22 @@ kbd, .cmdk-esc {
 .habit-stats strong { color: var(--ink); }
 .habit-card-actions { display: flex; gap: 0.6rem; margin-top: auto; }
 .habit-card-actions button { border: none; background: none; color: var(--ink-muted); font-size: 0.76rem; text-decoration: underline; padding: 0; }
+.habit-card-actions [data-action="complete"], .entry-actions [data-action="complete"] { color: var(--teal); font-weight: 700; }
+.habit-card-actions [data-action="archive"], .entry-actions [data-action="archive"] { color: var(--amber); font-weight: 700; }
+.archive-toggle { white-space: nowrap; }
+.archive-toggle span { font-family: var(--font-mono); color: var(--teal); }
+.archive-only-toolbar { justify-content: flex-end; }
+.record-archive { margin-top: 1rem; padding: 1rem; }
+.record-archive-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.record-archive-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.7rem; align-items: center; padding: 0.65rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-strong); }
+.record-archive-item strong { display: block; font-size: 0.84rem; }
+.record-archive-actions { display: flex; gap: 0.55rem; }
+.record-archive-actions button { border: none; background: none; color: var(--teal); text-decoration: underline; font-size: 0.74rem; }
+.record-completed { opacity: 0.82; }
+@media (max-width: 620px) {
+  .record-archive-item { grid-template-columns: 1fr; }
+  .record-archive-actions { justify-content: flex-end; }
+}
 
 /* =========================================================
    Widgets do Dashboard — Metas em destaque & Hábitos de hoje
